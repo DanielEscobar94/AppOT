@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <div class="bg-dark text-white bg-gradient px-4 py-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-speedometer2" style="color:#818cf8;"></i>
+            Panel de Administración
+          </h4>
+          <p class="mb-0 small opacity-50">Métricas y acceso rápido del sistema</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-4 py-3 border-bottom bg-light">
+      <div class="row g-2">
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-danger bg-opacity-10 rounded-3 text-center">
+            <div class="text-danger fw-bold fs-5">{{ ordenes_finalizadas }}</div>
+            <small class="text-muted">Mis Ordenes Finalizadas</small>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-primary bg-opacity-10 rounded-3 text-center">
+            <div class="text-primary fw-bold fs-5">{{ total_usuarios }}</div>
+            <small class="text-muted">Usuarios</small>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-success bg-opacity-10 rounded-3 text-center">
+            <div class="text-success fw-bold fs-5">{{ total_sucursales }}</div>
+            <small class="text-muted">Sucursales</small>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-warning bg-opacity-10 rounded-3 text-center">
+            <div class="text-warning fw-bold fs-5">{{ total_ventas }}</div>
+            <small class="text-muted">Ventas</small>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-info bg-opacity-10 rounded-3 text-center">
+            <div class="text-info fw-bold fs-5">{{ total_clientes }}</div>
+            <small class="text-muted">Clientes</small>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="p-3 bg-secondary bg-opacity-10 rounded-3 text-center">
+            <div class="text-secondary fw-bold fs-5">{{ total_productos }}</div>
+            <small class="text-muted">Productos</small>
+          </div>
+        </div>
+      </div>
+      <div class="row mt-2">
+        <div class="col-6 col-sm-4 col-md-2 offset-md-5">
+          <div class="p-3 bg-dark bg-opacity-10 rounded-3 text-center">
+            <div class="text-dark fw-bold fs-5">{{ total_ordenes }}</div>
+            <small class="text-muted">Ordenes</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="crudCards" class="px-4 py-3">
+      <div class="row g-3">
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-person-badge display-6 text-primary mb-2"></i>
+              <h5 class="card-title">Usuarios</h5>
+              <p class="card-text small text-muted">Gestiona usuarios del sistema.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('users.listar') }}" class="btn btn-primary btn-sm">Ver todos</a>
+                <a href="{{ url_for('users.nuevo') }}" class="btn btn-outline-success btn-sm">Crear nuevo</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-building display-6 text-success mb-2"></i>
+              <h5 class="card-title">Sucursales</h5>
+              <p class="card-text small text-muted">Gestiona sucursales y ubicaciones.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('branches.listar') }}" class="btn btn-success btn-sm">Ver todas</a>
+                <a href="{{ url_for('branches.nuevo') }}" class="btn btn-outline-success btn-sm">Crear nueva</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-cash-coin display-6 text-warning mb-2"></i>
+              <h5 class="card-title">Ventas</h5>
+              <p class="card-text small text-muted">Consulta y registra ventas.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('sales.listar') }}" class="btn btn-warning btn-sm">Ver todas</a>
+                <a href="{{ url_for('sales.nueva') }}" class="btn btn-outline-warning btn-sm">Registrar venta</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-people display-6 text-info mb-2"></i>
+              <h5 class="card-title">Clientes</h5>
+              <p class="card-text small text-muted">Administra clientes y contactos.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('clients.listar') }}" class="btn btn-info btn-sm">Ver todos</a>
+                <a href="{{ url_for('clients.nuevo') }}" class="btn btn-outline-info btn-sm">Crear nuevo</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-box-seam display-6 text-secondary mb-2"></i>
+              <h5 class="card-title">Productos</h5>
+              <p class="card-text small text-muted">Gestiona productos y servicios.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('products.listar') }}" class="btn btn-secondary btn-sm">Ver todos</a>
+                <a href="{{ url_for('products.nuevo') }}" class="btn btn-outline-secondary btn-sm">Crear nuevo</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-clipboard-data display-6 text-dark mb-2"></i>
+              <h5 class="card-title">Ordenes de Servicio</h5>
+              <p class="card-text small text-muted">Controla ordenes y servicios.</p>
+              <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-dark btn-sm">Ver ordenes</a>
+                <a href="{{ url_for('ordenes.crear_orden') }}" class="btn btn-outline-dark btn-sm">Crear nueva</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% if current_user.is_authenticated and current_user.rol == 'admin' %}
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-image display-6 text-secondary mb-2"></i>
+              <h5 class="card-title">Logo de la empresa</h5>
+              <p class="card-text small text-muted">Sube o cambia el logo que se muestra en la barra superior.</p>
+              <a href="{{ url_for('dashboard.cambiar_logo') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-upload"></i> Cambiar logo
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-building-fill display-6 text-primary mb-2"></i>
+              <h5 class="card-title">Datos de la empresa</h5>
+              <p class="card-text small text-muted">Editar nombre, direccion y telefono que aparecen en el ticket POS.</p>
+              <a href="{{ url_for('dashboard.company') }}" class="btn btn-primary btn-sm">Editar empresa</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-printer-fill display-6 text-secondary mb-2"></i>
+              <h5 class="card-title">Formato POS</h5>
+              <p class="card-text small text-muted">Configura el formato del ticket termico por sucursal.</p>
+              <a href="{{ url_for('dashboard.pos_format') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-gear"></i> Configurar POS
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body text-center">
+              <i class="bi bi-shield-lock display-6 text-warning mb-2"></i>
+              <h5 class="card-title">Logs de Seguridad</h5>
+              <p class="card-text small text-muted">Revisa el historial de inicios de sesion y actividad de usuarios.</p>
+              <a href="{{ url_for('users.login_logs') }}" class="btn btn-warning btn-sm">
+                <i class="bi bi-eye"></i> Ver Logs
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row g-3 px-4 pb-4">
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-dark text-white fw-bold small">Ultimos usuarios</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light"><tr><th>Nombre</th><th>Rol</th><th>Sucursal</th></tr></thead>
+                <tbody>
+                  {% for u in ultimos_usuarios %}
+                  <tr><td>{{ u.username or u.email }}</td><td>{{ u.rol }}</td><td>{{ u.branch.nombre if u.branch else '—' }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-dark text-white fw-bold small">Ultimas ventas</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light"><tr><th>Factura</th><th>Cliente</th><th>Total</th></tr></thead>
+                <tbody>
+                  {% for v in ultimas_ventas %}
+                  <tr onclick="window.location.href='{{ url_for('sales.ver', venta_id=v.id, pos=0) }}'" style="cursor: pointer;">
+                    <td>{{ v.numero_factura }}</td>
+                    <td>{{ v.cliente.nombre }}</td>
+                    <td>${{ v.total }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3 px-4 pb-4">
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-dark text-white fw-bold small">Ultimos clientes</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light"><tr><th>Nombre</th><th>Correo</th><th>Telefono</th></tr></thead>
+                <tbody>
+                  {% for c in ultimos_clientes %}
+                  <tr><td>{{ c.nombre }}</td><td>{{ c.correo }}</td><td>{{ c.telefono }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-dark text-white fw-bold small">Ultimos productos</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light"><tr><th>Nombre</th><th>SKU</th><th>Precio</th></tr></thead>
+                <tbody>
+                  {% for p in ultimos_productos %}
+                  <tr><td>{{ p.nombre }}</td><td>{{ p.sku }}</td><td>${{ (p.precio) | round(0) }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3 px-4 pb-4">
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-dark text-white fw-bold small">Ordenes de Servicio recientes</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light"><tr><th>ID</th><th>Cliente</th><th>Categoria</th><th>Estado</th></tr></thead>
+                <tbody>
+                  {% for o in ultimas_ordenes %}
+                  <tr>
+                    <td>{{ o.id }}</td>
+                    <td>{{ o.client.nombre }}</td>
+                    <td>{{ o.categoria.value }}</td>
+                    <td>{% if o.caracteristicas_articulo %}{{ o.caracteristicas_articulo }}{% elif o.estado_equipo %}{{ o.estado_equipo.name if o.estado_equipo.name else (o.estado_equipo.value if o.estado_equipo.value else '—') }}{% else %}—{% endif %}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary">
+      <i class="bi bi-plus-circle"></i> Registrar Salida de Producto
+    </h2>
+    <a href="{{ url_for('salidas.listar') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-box-arrow-right"></i> Nueva Salida</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-3">
+              <!-- Producto -->
+              <div class="col-md-6">
+                <label for="producto_buscar" class="form-label fw-bold">Producto *</label>
+                <div class="position-relative">
+                  <input type="text" id="producto_buscar" class="form-control" 
+                         placeholder="Buscar por nombre o SKU..." autocomplete="off" required>
+                  <input type="hidden" name="producto_id" id="producto_id" required>
+                  
+                  <!-- Dropdown de resultados -->
+                  <div id="producto_dropdown" class="dropdown-menu w-100" style="max-height: 300px; overflow-y: auto;">
+                  </div>
+                  
+                  <!-- Producto seleccionado -->
+                  <div id="producto_seleccionado" class="mt-2 d-none">
+                    <div class="alert alert-success py-2 mb-0">
+                      <i class="bi bi-check-circle"></i> 
+                      <strong id="producto_nombre"></strong> 
+                      <small class="text-muted">SKU: <span id="producto_sku"></span></small>
+                      <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="limpiarProducto()">
+                        <i class="bi bi-x"></i> Cambiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cantidad -->
+              <div class="col-md-3">
+                <label for="cantidad" class="form-label fw-bold">Cantidad *</label>
+                <input type="number" name="cantidad" id="cantidad" class="form-control" 
+                       min="1" required placeholder="0">
+              </div>
+
+              <!-- Sucursal -->
+              <div class="col-md-3">
+                <label for="sucursal_id" class="form-label fw-bold">Sucursal *</label>
+                <select name="sucursal_id" id="sucursal_id" class="form-select" required>
+                  <option value="">Seleccione</option>
+                  {% for sucursal in sucursales %}
+                    <option value="{{ sucursal.id }}" 
+                            {% if current_user.branch_id == sucursal.id %}selected{% endif %}>
+                      {{ sucursal.nombre }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Tipo de Salida -->
+              <div class="col-md-6">
+                <label for="tipo_salida" class="form-label fw-bold">Tipo de Salida *</label>
+                <select name="tipo_salida" id="tipo_salida" class="form-select" required>
+                  <option value="">Seleccione el tipo</option>
+                  {% for valor, texto in tipos_salida %}
+                    <option value="{{ valor }}">{{ texto }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Motivo -->
+              <div class="col-md-6">
+                <label for="motivo" class="form-label fw-bold">Motivo/Observaciones</label>
+                <input type="text" name="motivo" id="motivo" class="form-control" 
+                       placeholder="Descripcion del motivo (opcional)" maxlength="255">
+              </div>
+
+              <!-- Informacion adicional segun tipo -->
+              <div class="col-12">
+                <div class="alert alert-info d-none" id="info-tipo">
+                  <small id="info-texto"></small>
+                </div>
+              </div>
+
+              <!-- Botones -->
+              <div class="col-12">
+                <hr>
+                <div class="d-flex justify-content-end gap-2">
+                  <a href="{{ url_for('salidas.listar') }}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                  </a>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Registrar Salida
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tipoSelect = document.getElementById('tipo_salida');
+  const infoDiv = document.getElementById('info-tipo');
+  const infoTexto = document.getElementById('info-texto');
+  
+  // Elementos del buscador de productos
+  const productoBuscar = document.getElementById('producto_buscar');
+  const productoId = document.getElementById('producto_id');
+  const productoDropdown = document.getElementById('producto_dropdown');
+  const productoSeleccionado = document.getElementById('producto_seleccionado');
+  const productoNombre = document.getElementById('producto_nombre');
+  const productoSku = document.getElementById('producto_sku');
+  
+  let timeoutId = null;
+  
+  const infoTipos = {
+    'defectuoso': 'Se registrara la salida de productos con defectos de fabricacion o danos.',
+    'perdida': 'Para productos extraviados, robados o perdidos por cualquier motivo.',
+    'traslado': 'Productos transferidos a otra sucursal o ubicacion.',
+    'devolucion': 'Productos devueltos por clientes o proveedores.',
+    'consumo_interno': 'Productos utilizados internamente por la empresa.',
+    'regalo': 'Productos obsequiados a clientes o empleados.',
+    'otros': 'Cualquier otro tipo de salida no especificada arriba.'
+  };
+  
+  // Informacion de tipos de salida
+  tipoSelect.addEventListener('change', function() {
+    const tipo = this.value;
+    if (tipo && infoTipos[tipo]) {
+      infoTexto.textContent = infoTipos[tipo];
+      infoDiv.classList.remove('d-none');
+    } else {
+      infoDiv.classList.add('d-none');
+    }
+  });
+  
+  // Busqueda de productos
+  productoBuscar.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    // Limpiar timeout anterior
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    
+    if (query.length < 2) {
+      productoDropdown.classList.remove('show');
+      return;
+    }
+    
+    // Esperar 300ms antes de buscar
+    timeoutId = setTimeout(() => {
+      buscarProductos(query);
+    }, 300);
+  });
+  
+  // Busqueda AJAX de productos
+  function buscarProductos(query) {
+    fetch(`{{ url_for('salidas.buscar_producto') }}?q=${encodeURIComponent(query)}`)
+      .then(response => response.json())
+      .then(productos => {
+        mostrarResultados(productos);
+      })
+      .catch(error => {
+        console.error('Error al buscar productos:', error);
+        productoDropdown.classList.remove('show');
+      });
+  }
+  
+  // Mostrar resultados de busqueda
+  function mostrarResultados(productos) {
+    productoDropdown.innerHTML = '';
+    
+    if (productos.length === 0) {
+      productoDropdown.innerHTML = '<div class="dropdown-item-text text-muted">No se encontraron productos</div>';
+    } else {
+      productos.forEach(producto => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'dropdown-item d-flex justify-content-between';
+        item.innerHTML = `
+          <div>
+            <strong>${producto.nombre}</strong><br>
+            <small class="text-muted">SKU: ${producto.sku}</small>
+          </div>
+          ${producto.precio > 0 ? `<small class="text-success">$${producto.precio.toLocaleString()}</small>` : ''}
+        `;
+        
+        item.addEventListener('click', () => {
+          seleccionarProducto(producto);
+        });
+        
+        productoDropdown.appendChild(item);
+      });
+    }
+    
+    productoDropdown.classList.add('show');
+  }
+  
+  // Seleccionar producto
+  function seleccionarProducto(producto) {
+    productoId.value = producto.id;
+    productoBuscar.value = '';
+    productoNombre.textContent = producto.nombre;
+    productoSku.textContent = producto.sku;
+    
+    productoDropdown.classList.remove('show');
+    productoSeleccionado.classList.remove('d-none');
+    productoBuscar.style.display = 'none';
+  }
+  
+  // Limpiar seleccion de producto
+  window.limpiarProducto = function() {
+    productoId.value = '';
+    productoBuscar.value = '';
+    productoBuscar.style.display = 'block';
+    productoSeleccionado.classList.add('d-none');
+    productoDropdown.classList.remove('show');
+    productoBuscar.focus();
+  };
+  
+  // Cerrar dropdown al hacer click fuera
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.position-relative')) {
+      productoDropdown.classList.remove('show');
+    }
+  });
+  
+  // Auto-focus en buscador de producto
+  productoBuscar.focus();
+});
+</script>
+{% endblock %}

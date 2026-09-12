@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Editar Producto</h2>
+
+<form method="POST">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    {{ form.nombre.label(class="form-label") }}
+    {{ form.nombre(class="form-control text-uppercase") }}
+    {% for error in form.nombre.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.sku.label(class="form-label") }}
+    {{ form.sku(class="form-control") }}
+    {% for error in form.sku.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.precio.label(class="form-label") }}
+    {{ form.precio(class="form-control") }}
+    {% for error in form.precio.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+
+
+  <div class="mb-3">
+    {{ form.categoria.label(class="form-label") }}
+    <div class="input-group">
+      {{ form.categoria(class="form-select", id="categoria-select") }}
+      <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalCategoria">
+        Nueva categoria
+      </button>
+    </div>
+    {% for error in form.categoria.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary">Actualizar</button>
+  <a href="{{ url_for('products.listar') }}" class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+
+<!-- 🧩 Modal para nueva categoria -->
+<div class="modal fade" id="modalCategoria" tabindex="-1" aria-labelledby="modalCategoriaLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="form-categoria-modal" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalCategoriaLabel">Crear nueva categoria</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="form-control" name="nombre" placeholder="Nombre de la categoria" required>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Script AJAX compartido -->
+<script>
+  document.getElementById("form-categoria-modal").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const nombre = this.nombre.value.trim();
+    if (!nombre) return;
+
+    fetch("/categories/api/nueva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: nombre })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.id && data.nombre) {
+        const select = document.getElementById("categoria-select");
+        const option = new Option(data.nombre, data.id, true, true);
+        select.add(option);
+        bootstrap.Modal.getInstance(document.getElementById("modalCategoria")).hide();
+        this.reset();
+      } else {
+        alert(data.error || "Error al crear la categoria.");
+      }
+    })
+    .catch(() => alert("Error de conexion"));
+  });
+</script>
+{% endblock %}

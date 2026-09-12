@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reporte de Órdenes de Trabajo - Imprimir</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    @page {
+      size: letter;
+      margin: 15mm;
+      @bottom-center {
+        content: "Página " counter(page) " de " counter(pages);
+      }
+    }
+    body {
+      font-family: 'Times New Roman', serif;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .table {
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+    .table th, .table td {
+      padding: 4px 6px;
+      vertical-align: middle;
+    }
+    .table-warning {
+      background-color: #f8f9fa !important;
+      border: 1px solid #dee2e6 !important;
+    }
+    .card {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .card-header {
+      background-color: #000 !important;
+      color: white !important;
+      border-bottom: 2px solid #000 !important;
+      padding: 8px;
+    }
+    .card-header h2 {
+      font-size: 18px;
+      margin-bottom: 2px;
+    }
+    .card-header p {
+      font-size: 14px;
+      margin-bottom: 0;
+    }
+    .border {
+      border: 1px solid #dee2e6 !important;
+    }
+    .stats-box {
+      border: 1px solid #dee2e6;
+      padding: 6px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .stats-box h4 {
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+    .stats-box p {
+      font-size: 12px;
+      margin-bottom: 0;
+    }
+    .filters-info {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      padding: 6px;
+      margin-bottom: 10px;
+    }
+    .filters-info h5 {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .filters-info ul {
+      margin-bottom: 0;
+      padding-left: 0;
+    }
+    .filters-info li {
+      font-size: 12px;
+      margin-right: 15px;
+    }
+    @media print {
+      button { display: none !important; }
+      .d-print-none { display: none !important; }
+      body { font-size: 11px; }
+      .table { font-size: 10px; }
+      * { color: black !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-2">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header text-center">
+            <h2>REPORTE DE ÓRDENES DE TRABAJO</h2>
+            <p>Estado y seguimiento de reparaciones</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información de filtros aplicados -->
+    <div class="row mb-2">
+      <div class="col-12">
+        <div class="filters-info">
+          <h5>Filtros Aplicados:</h5>
+          <ul class="list-inline">
+            <li class="list-inline-item"><strong>Estado:</strong> {{ filtros.estado|default('Todos')|title }}</li>
+            {% if filtros.sucursal_nombre %}
+            <li class="list-inline-item"><strong>Sucursal:</strong> {{ filtros.sucursal_nombre }}</li>
+            {% endif %}
+            {% if filtros.sitio_nombre %}
+            <li class="list-inline-item"><strong>Sitio:</strong> {{ filtros.sitio_nombre }}</li>
+            {% endif %}
+            {% if filtros.fecha_inicio or filtros.fecha_fin %}
+            <li class="list-inline-item"><strong>Período:</strong> {{ filtros.fecha_inicio|default('Inicio') }} - {{ filtros.fecha_fin|default('Hoy') }}</li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-3">
+      <div class="col-2">
+        <div class="stats-box">
+          <h4>{{ stats.total }}</h4>
+          <p>Total Órdenes</p>
+        </div>
+      </div>
+      <div class="col-2">
+        <div class="stats-box">
+          <h4>{{ stats.finalizado_no_facturado }}</h4>
+          <p>Finalizadas No Facturadas</p>
+        </div>
+      </div>
+      <div class="col-2">
+        <div class="stats-box">
+          <h4>{{ stats.facturado }}</h4>
+          <p>Facturadas</p>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="stats-box">
+          <h4>${{ "{:,.0f}".format(stats.total_valor).replace(",", ".") }}</h4>
+          <p>Valor Total Servicios</p>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="stats-box">
+          <h4>${{ "{:,.0f}".format(stats.total_repuestos).replace(",", ".") }}</h4>
+          <p>Valor Total Repuestos</p>
+        </div>
+      </div>
+    </div>
+
+        <!-- Tabla de órdenes -->
+        {% if ordenes %}
+        <table class="table table-bordered table-sm">
+          <thead style="background-color: #f8f9fa;">
+            <tr>
+              <th style="width: 7%;"># OT</th>
+              <th style="width: 18%;">Cliente</th>
+              <th style="width: 12%;">Sucursal</th>
+              <th style="width: 9%;">Fecha Creación</th>
+              <th style="width: 9%;">Fecha Entrega</th>
+              <th style="width: 10%;">Estado</th>
+              <th style="width: 10%;">Técnico</th>
+              <th style="width: 8%;">Valor Servicio</th>
+              <th style="width: 8%;">Valor Repuestos</th>
+              <th style="width: 4%;">Facturado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for orden in ordenes %}
+            <tr class="{% if (orden.estado|lower == 'finalizado') and not (orden.venta_rel) %}table-warning{% endif %}">
+              <td><strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></td>
+              <td style="font-size: 10px;">{{ orden.client.nombre if orden.client else '—' }}</td>
+              <td style="font-size: 10px;">{{ orden.branch.nombre if orden.branch else '—' }}</td>
+              <td style="font-size: 10px;">{{ orden.fecha_creacion|local_date if orden.fecha_creacion else '—' }}</td>
+              <td style="font-size: 10px;">{{ orden.fecha_entrega|local_date if orden.fecha_entrega else '—' }}</td>
+              <td style="font-size: 10px;">
+                {% set estado_lower = orden.estado|lower if orden.estado else '' %}
+                {% if estado_lower == 'pendiente' %}
+                  Pendiente
+                {% elif estado_lower == 'en_proceso' %}
+                  En Proceso
+                {% elif estado_lower == 'finalizado' %}
+                  Finalizado
+                {% elif estado_lower == 'facturado' %}
+                  Facturado
+                {% else %}
+                  {{ orden.estado|title if orden.estado else 'Sin estado' }}
+                {% endif %}
+              </td>
+              <td style="font-size: 10px;">{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+              <td class="text-end" style="font-size: 10px;">${{ "{:,.0f}".format(calcular_total_orden(orden)).replace(",", ".") }}</td>
+              <td class="text-end" style="font-size: 10px;">${{ "{:,.0f}".format(calcular_total_repuestos(orden)).replace(",", ".") }}</td>
+              <td class="text-center">
+                {% set esta_facturada = (orden.estado|lower == 'facturado') or (orden.venta_rel) %}
+                {% if esta_facturada %}
+                  ✓
+                {% else %}
+                  ✗
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-3">
+          <p style="font-size: 10px;">No se encontraron órdenes que coincidan con los filtros aplicados.</p>
+        </div>
+        {% endif %}
+
+        <!-- Detalle de Repuestos Implementados -->
+        {% if ordenes_con_repuestos|length > 0 %}
+        <div class="mt-4" style="page-break-before: auto;">
+          <h5 class="text-center fw-bold mb-3" style="font-size: 14px; background-color: #6c757d; color: white; padding: 8px;">DETALLE DE REPUESTOS IMPLEMENTADOS</h5>
+          
+          {% for item in ordenes_con_repuestos %}
+          {% set orden = item.orden %}
+          {% set repuestos = item.repuestos %}
+          <div class="mb-3 border p-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong style="font-size: 12px;">OT #{{ orden.consecutivo or orden.id }} - {{ orden.client.nombre if orden.client else 'Sin cliente' }}</strong>
+              <span style="font-size: 11px;" class="text-muted">{{ orden.branch.nombre if orden.branch else '—' }}</span>
+            </div>
+            
+            <table class="table table-bordered table-sm mb-0">
+              <thead style="background-color: #e9ecef; font-size: 10px;">
+                <tr>
+                  <th style="width: 40%;">Repuesto</th>
+                  <th style="width: 10%;" class="text-center">Cantidad</th>
+                  <th style="width: 15%;" class="text-end">Costo Unit.</th>
+                  <th style="width: 15%;" class="text-end">Costo Total</th>
+                  <th style="width: 20%;">Notas</th>
+                </tr>
+              </thead>
+              <tbody style="font-size: 10px;">
+                {% for repuesto in repuestos %}
+                <tr>
+                  <td>{{ repuesto.nombre or '—' }}</td>
+                  <td class="text-center">{{ repuesto.cantidad }}</td>
+                  <td class="text-end">${{ "{:,.0f}".format(repuesto.costo_unitario or 0).replace(",", ".") }}</td>
+                  <td class="text-end">${{ "{:,.0f}".format(repuesto.costo_total or 0).replace(",", ".") }}</td>
+                  <td style="font-size: 9px;">{{ repuesto.notas_privadas[:50] if repuesto.notas_privadas else '—' }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="fw-bold" style="background-color: #f8f9fa;">
+                  <td colspan="3" class="text-end">Subtotal Repuestos OT:</td>
+                  <td class="text-end">${{ "{:,.0f}".format(calcular_total_repuestos(orden)).replace(",", ".") }}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+
+        <!-- Footer -->
+        <div class="row mt-2">
+          <div class="col-12 text-center text-muted">
+            <small style="font-size: 10px;">Reporte generado el {{ 'now'|local_datetime }}</small>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center mt-3 d-print-none">
+    <button onclick="window.print()" class="btn btn-primary">Imprimir Reporte</button>
+    <button onclick="window.close()" class="btn btn-secondary ms-2">Cerrar</button>
+  </div>
+  
+  <script>
+    // Auto-print and close tab after printing
+    window.onload = function(){
+      setTimeout(function(){
+        window.print();
+      }, 250);
+    };
+    
+    // Close window after print dialog is closed (whether printed or cancelled)
+    window.onafterprint = function(){
+      setTimeout(function(){ 
+        window.close(); 
+      }, 300);
+    };
+    
+    // Also close on print start for better UX
+    window.onbeforeprint = function(){
+      // Optional: could add loading indicator here
+    };
+  </script>
+</body>
+</html>

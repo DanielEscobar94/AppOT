@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% block title %}Reporte de Ventas{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- ─── Header ─── -->
+    <div class="bg-dark text-white bg-gradient px-4 py-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-graph-up" style="color:#818cf8;"></i>
+            Reporte de Ventas
+          </h4>
+          <p class="mb-0 small opacity-50">Filtrar por sucursal, caja o rango de fechas</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Filtros ─── -->
+    <div class="bg-light px-4 py-3 border-bottom">
+      <div class="alert alert-info mb-3 py-2 small">
+        <i class="bi bi-info-circle-fill"></i> Las ventas de <strong>AppOT</strong> son procesadas en efectivo/POS local, las de <strong>Siigo</strong> en el sistema contable externo.
+      </div>
+      <form method="GET" class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Sucursal</label>
+          <select name="sucursal" id="sucursal" class="form-select form-select-sm">
+            <option value="">Todas las sucursales</option>
+            {% for sucursal in sucursales %}
+            <option value="{{ sucursal.id }}" {% if filtros.sucursal_id==sucursal.id %}selected{% endif %}>
+              {{ sucursal.nombre }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Caja</label>
+          <select name="caja" id="caja" class="form-select form-select-sm">
+            <option value="">Todas las cajas</option>
+            <option value="appot" {% if filtros.caja=='appot' %}selected{% endif %}>AppOT</option>
+            <option value="siigo" {% if filtros.caja=='siigo' %}selected{% endif %}>Siigo</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Inicial</label>
+          <input type="text" name="fecha_inicio" id="fecha_inicio" class="form-control form-control-sm datepicker"
+            value="{{ filtros.fecha_inicio or '' }}" placeholder="dd/mm/yyyy">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Final</label>
+          <input type="text" name="fecha_fin" id="fecha_fin" class="form-control form-control-sm datepicker"
+            value="{{ filtros.fecha_fin or '' }}" placeholder="dd/mm/yyyy">
+        </div>
+        <div class="col-md-4 d-flex gap-1">
+          <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-search"></i> Filtrar</button>
+          <button type="submit" formaction="{{ url_for('reportes.exportar_ventas') }}" class="btn btn-success btn-sm" title="Exportar a Excel">
+            <i class="bi bi-file-earmark-excel"></i>
+          </button>
+          <a href="{{ url_for('reportes.ventas') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+            <i class="bi bi-x-circle"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── Resumen ─── -->
+    <div class="px-4 py-3 border-bottom">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="p-3 bg-success bg-opacity-10 rounded-3 text-center">
+            <div class="text-success fw-bold fs-4">${{ "{:,.0f}".format(total_anticipos_appot).replace(",", ".") }}</div>
+            <small class="text-muted">Anticipos AppOT <span class="text-muted">(Efectivo sin facturar)</span></small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-info bg-opacity-10 rounded-3 text-center">
+            <div class="text-info fw-bold fs-4">${{ "{:,.0f}".format(total_anticipos_siigo).replace(",", ".") }}</div>
+            <small class="text-muted">Anticipos Siigo <span class="text-muted">(Tarjeta/Transferencia)</span></small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-primary bg-opacity-10 rounded-3 text-center">
+            <div class="text-primary fw-bold fs-4">${{ "{:,.0f}".format(total_ventas_acumulado).replace(",", ".") }}</div>
+            <small class="text-muted">Total en Caja <span class="text-muted">(Ventas + Anticipos AppOT)</span></small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Tabla ─── -->
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Factura</th>
+            <th>Cliente</th>
+            <th>Sucursal</th>
+            <th>Fecha</th>
+            <th>Caja</th>
+            <th>Vendedor</th>
+            <th class="text-end">Neto Venta</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for venta in ventas %}
+          <tr>
+            <td class="fw-semibold">
+              FAC-{{ venta.numero_factura }}
+              {% if venta.orden_id %}
+              <span class="badge bg-warning text-dark ms-1" title="Factura de OT">
+                <i class="bi bi-tools"></i>
+              </span>
+              {% endif %}
+              {% if venta.anticipo_total and venta.anticipo_total > 0 %}
+              <span class="badge bg-info text-dark ms-1" title="Tiene abono">
+                <i class="bi bi-piggy-bank"></i>
+              </span>
+              {% endif %}
+            </td>
+            <td>{{ venta.client.nombre if venta.client else '—' }}</td>
+            <td><span class="badge bg-secondary">{{ venta.branch.nombre if venta.branch else '—' }}</span></td>
+            <td class="small">{{ venta.fecha|local_datetime if venta.fecha else '—' }}</td>
+            <td>
+              {% if venta.caja_tramite == 'siigo' %}
+              <span class="badge bg-primary"><i class="bi bi-info-circle"></i> Siigo</span>
+              {% else %}
+              <span class="badge bg-success"><i class="bi bi-check-circle"></i> AppOT</span>
+              {% endif %}
+            </td>
+            <td>{{ venta.usuario.username if venta.usuario else '—' }}</td>
+            {% set displayed_total = venta._displayed_total if venta._displayed_total is defined else (venta.total or 0) %}
+            {% set descuento = venta._descuento_val if venta._descuento_val is defined else (venta.descuento or 0) %}
+            {% set neto = venta._neto if venta._neto is defined else (displayed_total - descuento) %}
+            {% if neto < 0 %}{% set neto = 0 %}{% endif %}
+            <td class="text-end fw-bold">${{ "{:,.0f}".format(neto).replace(",", ".") }}</td>
+            <td class="text-center">
+              <a href="{{ url_for('sales.ver', venta_id=venta.id, pos=0, ref='reportes') }}"
+                class="btn btn-sm btn-outline-info border-0" title="Ver detalle">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-4 text-muted">
+              No se encontraron ventas con los filtros aplicados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% set total_ventas_acumulado = total_ventas_acumulado or 0 %}
+        {% if ventas and ventas_pagination.page == ventas_pagination.pages %}
+        <tfoot class="table-dark">
+          <tr>
+            <th colspan="6" class="text-end">TOTAL:</th>
+            <th class="text-end">${{ "{:,.0f}".format(total_ventas_acumulado).replace(",", ".") }}</th>
+            <th></th>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- ─── Contador ─── -->
+    {% if ventas_pagination is defined and ventas_pagination.total > 0 %}
+    <div class="px-4 py-2 border-top text-muted small">
+      {% set start = (ventas_pagination.page - 1) * ventas_pagination.per_page + 1 %}
+      {% set end = (ventas_pagination.page - 1) * ventas_pagination.per_page + (ventas|length) %}
+      Mostrando {{ start }}–{{ end }} de {{ ventas_pagination.total }} venta(s) | Página {{ ventas_pagination.page }} de {{ ventas_pagination.pages }}
+    </div>
+    {% endif %}
+
+    <!-- ─── Paginación ─── -->
+    {% if ventas_pagination is defined and ventas_pagination.pages > 1 %}
+    <div class="px-4 pb-3">
+      {% set qparam = [] %}
+      {% if filtros.sucursal_id %}
+        {% set _ = qparam.append('sucursal=' ~ filtros.sucursal_id) %}
+      {% endif %}
+      {% if filtros.caja %}
+        {% set _ = qparam.append('caja=' ~ filtros.caja) %}
+      {% endif %}
+      {% if filtros.fecha_inicio %}
+        {% set _ = qparam.append('fecha_inicio=' ~ filtros.fecha_inicio|urlencode) %}
+      {% endif %}
+      {% if filtros.fecha_fin %}
+        {% set _ = qparam.append('fecha_fin=' ~ filtros.fecha_fin|urlencode) %}
+      {% endif %}
+      {% set qparam_str = qparam|join('&') %}
+      {% set qs = ('&' ~ qparam_str) if qparam_str else '' %}
+
+      <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+        {% if ventas_pagination.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1{{ qs }}">Primera</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ventas_pagination.prev_num }}{{ qs }}">Anterior</a>
+        </li>
+        {% endif %}
+        {% for page_num in ventas_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if page_num %}
+            <li class="page-item {% if page_num == ventas_pagination.page %}active{% endif %}">
+              <a class="page-link" href="?page={{ page_num }}{{ qs }}">{{ page_num }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        {% if ventas_pagination.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ventas_pagination.next_num }}{{ qs }}">Siguiente</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ventas_pagination.pages }}{{ qs }}">Última</a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if ventas %}
+    <div class="px-4 py-3 border-top d-flex justify-content-end">
+      <button onclick="imprimirPOS()" class="btn btn-primary">
+        <i class="bi bi-receipt"></i> Imprimir Ventas
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+    function imprimirPOS() {
+        const baseUrl = "{{ url_for('reportes.ventas_print') }}";
+        const fechaInicio = "{{ request.args.get('fecha_inicio', '') }}";
+        const fechaFin = "{{ request.args.get('fecha_fin', '') }}";
+        const sucursal = "{{ request.args.get('sucursal', '') }}";
+        const params = [];
+        if (fechaInicio) params.push('fecha_inicio=' + encodeURIComponent(fechaInicio));
+        if (fechaFin) params.push('fecha_fin=' + encodeURIComponent(fechaFin));
+        if (sucursal) params.push('sucursal=' + encodeURIComponent(sucursal));
+        const url = params.length ? baseUrl + '?' + params.join('&') : baseUrl;
+
+        const ventana = window.open(url, 'impresion', 'width=800,height=600,scrollbars=yes');
+        if (ventana) ventana.focus();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        sessionStorage.setItem('reportes_ventas_return_url', window.location.href);
+
+        const datepickers = document.querySelectorAll('.datepicker');
+        datepickers.forEach(function (picker) {
+            new Pikaday({
+                field: picker,
+                format: 'DD/MM/YYYY',
+                toString(date, format) {
+                    const day = date.getDate().toString().padStart(2, '0');
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                },
+                parse(dateString, format) {
+                    const parts = dateString.split('/');
+                    const day = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10) - 1;
+                    const year = parseInt(parts[2], 10);
+                    return new Date(year, month, day);
+                }
+            });
+        });
+    });
+</script>
+
+{% endblock %}

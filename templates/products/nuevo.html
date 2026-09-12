@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{% if producto %}Editar Producto{% else %}Nuevo Producto{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">{% if producto %}Editar Producto{% else %}Nuevo Producto{% endif %}</h2>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.sku.label(class="form-label") }}
+      {{ form.sku(class="form-control") }}
+      {% for error in form.sku.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.nombre.label(class="form-label") }}
+      {{ form.nombre(class="form-control text-uppercase") }}
+      {% for error in form.nombre.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.precio.label(class="form-label") }}
+      <input type="text" 
+             id="precio" 
+             name="precio" 
+             class="form-control" 
+             inputmode="numeric" 
+             pattern="[0-9\.]*"
+             value="{% if producto %}{{ producto.precio|int }}{% endif %}"
+             required>
+      {% for error in form.precio.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success">
+        {% if producto %}Actualizar{% else %}Crear{% endif %} Producto
+      </button>
+      <a href="{{ url_for('products.listar') }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

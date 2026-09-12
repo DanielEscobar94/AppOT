@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Traslado #{{ traslado.numero_traslado_siigo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+        <!-- ─── Header ─── -->
+        <div class="bg-dark text-white bg-gradient px-4 py-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <h4 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-left-right" style="color:#818cf8;"></i>
+                        Traslado #{{ traslado.numero_traslado_siigo }}
+                    </h4>
+                    {% if traslado.estado == 'confirmado' %}
+                        <span class="badge bg-success rounded-pill d-inline-flex align-items-center gap-1">
+                            <i class="bi bi-check-circle"></i> Confirmado
+                        </span>
+                    {% elif traslado.estado == 'anulado' %}
+                        <span class="badge bg-danger rounded-pill d-inline-flex align-items-center gap-1">
+                            <i class="bi bi-x-circle"></i> Anulado
+                        </span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark rounded-pill d-inline-flex align-items-center gap-1">
+                            <i class="bi bi-clock-history"></i> Pendiente
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-2">
+                    {% if traslado.estado == 'pendiente' %}
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalConfirmar">
+                            <i class="bi bi-check-circle me-1"></i> Confirmar Recepción
+                        </button>
+                        <a href="{{ url_for('traslados.editar', id=traslado.id) }}" class="btn btn-warning">
+                            <i class="bi bi-pencil-square me-1"></i> Editar
+                        </a>
+                    {% endif %}
+                    <a href="{{ url_for('traslados.listar') }}" class="btn btn-outline-light">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Body ─── -->
+        <div class="p-4">
+
+            <!-- Anulación alert -->
+            {% if traslado.estado == 'anulado' %}
+            <div class="alert alert-danger d-flex gap-3 align-items-start mb-4" role="alert">
+                <i class="bi bi-slash-circle-fill fs-4 mt-1"></i>
+                <div>
+                    <h6 class="alert-heading fw-semibold mb-1">Traslado Anulado</h6>
+                    <p class="mb-1 small"><strong>Anulado por:</strong> {{ traslado.anulado_por or '—' }}</p>
+                    {% if traslado.fecha_anulacion %}
+                    <p class="mb-1 small"><strong>Fecha:</strong> {{ traslado.fecha_anulacion.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
+                    <p class="mb-0 small"><strong>Motivo:</strong> {{ traslado.motivo_anulacion or '—' }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ─── Two-column: Info + Movement ─── -->
+            <div class="row g-4 mb-4">
+                <!-- Info -->
+                <div class="col-md-6">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0">No. Traslado Siigo:</th>
+                                    <td class="fw-semibold ps-0">{{ traslado.numero_traslado_siigo }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0">Fecha:</th>
+                                    <td class="ps-0">{{ traslado.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0">Responsable:</th>
+                                    <td class="ps-0">{{ traslado.responsable }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0">Registrado por:</th>
+                                    <td class="ps-0">{{ traslado.usuario.email or traslado.usuario.username }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0">Registrado:</th>
+                                    <td class="ps-0">{{ traslado.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                </tr>
+                                {% if traslado.estado == 'confirmado' %}
+                                <tr class="table-success">
+                                    <th scope="row" class="fw-normal ps-0">Confirmado por:</th>
+                                    <td class="fw-semibold ps-0">{{ traslado.confirmado_por }}</td>
+                                </tr>
+                                <tr class="table-success">
+                                    <th scope="row" class="fw-normal ps-0">Fecha confirmación:</th>
+                                    <td class="fw-semibold ps-0">{{ traslado.fecha_confirmacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th scope="row" class="text-muted fw-normal ps-0 border-bottom-0">Observación:</th>
+                                    <td class="ps-0 border-bottom-0">{{ traslado.observacion if traslado.observacion else '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Movement -->
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap py-3">
+                        <div class="p-3 bg-warning bg-opacity-10 text-warning-emphasis rounded-3">
+                            <i class="bi bi-shop fs-4 d-block mb-1"></i>
+                            <div class="fw-semibold">{{ traslado.branch_origen.nombre }}</div>
+                            <small class="opacity-75 text-uppercase">Origen</small>
+                        </div>
+                        <div>
+                            <i class="bi bi-arrow-right-circle-fill text-primary fs-1"></i>
+                        </div>
+                        <div class="p-3 bg-success bg-opacity-10 text-success-emphasis rounded-3">
+                            <i class="bi bi-shop fs-4 d-block mb-1"></i>
+                            <div class="fw-semibold">{{ traslado.branch_destino.nombre }}</div>
+                            <small class="opacity-75 text-uppercase">Destino</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Productos ─── -->
+            {% if traslado.detalles %}
+                {% for detalle in traslado.detalles %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span>{{ detalle.producto.nombre if detalle.producto else 'Producto no especificado' }}</span>
+                </div>
+                {% endfor %}
+            {% endif %}
+
+        </div><!-- /body -->
+    </div>
+</div>
+
+<!-- ─── Modal Confirmar ─── -->
+<div class="modal fade" id="modalConfirmar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-semibold">
+                    <i class="bi bi-check-circle me-2"></i>Confirmar Recepción
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formConfirmar" method="POST" action="{{ url_for('traslados.confirmar', id=traslado.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="alert alert-info d-flex gap-2 align-items-start mb-3 py-2" role="alert">
+                        <i class="bi bi-info-circle mt-1"></i>
+                        <div class="small">
+                            <strong>Traslado #{{ traslado.numero_traslado_siigo }}</strong><br>
+                            De: {{ traslado.branch_origen.nombre }} → A: {{ traslado.branch_destino.nombre }}<br>
+                            Productos: {{ traslado.detalles|length }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmado_por" class="form-label fw-semibold small">
+                            Nombre de quien confirma la recepción <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="confirmado_por" name="confirmado_por"
+                               placeholder="Ingrese su nombre completo" required autocomplete="off">
+                        <div class="form-text small">
+                            Ingrese su nombre para confirmar que recibió correctamente los productos trasladados.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="bi bi-check-circle me-1"></i> Confirmar Recepción
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formConfirmar');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('confirmado_por');
+            if (!input.value.trim()) {
+                alert('Por favor ingrese su nombre');
+                return;
+            }
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Confirmando...';
+            form.submit();
+        });
+    }
+});
+</script>
+{% endblock %}

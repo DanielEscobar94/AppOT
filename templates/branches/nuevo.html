@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">{{ sucursal.nombre if sucursal else 'Nueva Sucursal' }}</h2>
+
+<form method="POST">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    {{ form.nombre.label(class="form-label") }}
+    {{ form.nombre(class="form-control") }}
+    {% for error in form.nombre.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.direccion.label(class="form-label") }}
+    {{ form.direccion(class="form-control") }}
+    {% for error in form.direccion.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.ciudad.label(class="form-label") }}
+    {{ form.ciudad(class="form-control") }}
+    {% for error in form.ciudad.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.estado.label(class="form-label") }}
+    {{ form.estado(class="form-control") }}
+    {% for error in form.estado.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="form-check mb-3">
+    {{ form.activo(class="form-check-input") }}
+    {{ form.activo.label(class="form-check-label") }}
+  </div>
+
+  <button type="submit" class="btn btn-primary">Guardar</button>
+  <a href="{{ url_for('branches.listar') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

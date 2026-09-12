@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+{% from 'snippets/search_field.html' import search_field %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+        <!-- ─── Header ─── -->
+        <div class="bg-dark text-white bg-gradient px-4 py-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                        <i class="bi bi-box-seam" style="color:#818cf8;"></i>
+                        Productos
+                    </h4>
+                    <p class="mb-0 small opacity-50">Gestión del catálogo de productos</p>
+                </div>
+                <a href="{{ url_for('products.nuevo') }}" class="btn btn-light">
+                    <i class="bi bi-plus-lg me-1"></i> Nuevo Producto
+                </a>
+            </div>
+        </div>
+
+        <!-- ─── Buscar + Acciones ─── -->
+        <div class="bg-light px-4 py-3 border-bottom">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-lg-5 col-md-7 position-relative">
+                    {{ search_field(input_id='buscar-input', input_name='q',
+                                    results_id='sugerencias', label='Buscar producto',
+                                    placeholder='Nombre o SKU...',
+                                    value=query if query else '',
+                                    input_class='form-control form-control-sm') }}
+                </div>
+                <div class="col-lg-2 col-md-3 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-search me-1"></i> Buscar
+                    </button>
+                    {% if query %}
+                    <a href="{{ url_for('products.listar') }}" class="btn btn-outline-secondary btn-sm flex-fill" title="Limpiar">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="col-lg-5 col-md-2 d-flex gap-1 justify-content-md-end">
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportarExcel">
+                        <i class="bi bi-upload me-1"></i> Importar
+                    </button>
+                    <a href="{{ url_for('products.exportar_excel') }}" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-download me-1"></i> Exportar
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- ─── Tabla ─── -->
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted fw-semibold">
+                    <tr>
+                        <th>SKU</th>
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                        <th>Estado</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="table-group-divider">
+                    {% for p in productos.items %}
+                    <tr class="{% if p.bloqueado %}table-danger{% endif %}">
+                        <td class="font-monospace small">{{ p.sku }}</td>
+                        <td>
+                            {{ p.nombre }}
+                            {% if p.bloqueado %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill small ms-1">
+                                    <i class="bi bi-lock-fill me-1"></i>Bloqueado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-semibold">${{ "{:,.0f}".format(p.precio).replace(',', '.') }}</td>
+                        <td>
+                            {% if p.bloqueado %}
+                            <span class="badge bg-danger rounded-pill d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-lock-fill"></i> Bloqueado
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success rounded-pill d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-unlock-fill"></i> Activo
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="d-flex justify-content-end gap-1">
+                                <a href="{{ url_for('products.editar', id=p.id) }}"
+                                   class="btn btn-sm btn-outline-warning border-0" title="Editar">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('products.bloquear', id=p.id) }}?q={{ query }}&page={{ productos.page }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary border-0"
+                                            title="{% if p.bloqueado %}Desbloquear{% else %}Bloquear{% endif %}"
+                                            onclick="return confirm('{% if p.bloqueado %}¿Desbloquear este producto?{% else %}¿Bloquear este producto? No aparecerá en el POS.{% endif %}')">
+                                        <i class="bi {% if p.bloqueado %}bi-unlock-fill{% else %}bi-lock-fill{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('products.eliminar', id=p.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este producto?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Eliminar">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-secondary d-block mb-3"></i>
+                                <h6 class="fw-semibold text-secondary-emphasis">No hay productos</h6>
+                                <p class="text-muted small mb-0">
+                                    {% if query %}No se encontraron productos con "{{ query }}"{% else %}Aún no hay productos registrados.{% endif %}
+                                </p>
+                                <a href="{{ url_for('products.nuevo') }}" class="btn btn-primary btn-sm mt-3">
+                                    <i class="bi bi-plus-lg me-1"></i> Crear producto
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ─── Contador ─── -->
+        <div class="px-4 py-2 border-top text-muted small">
+          {% if productos.pages > 0 %}
+            {% set start = (productos.page - 1) * productos.per_page + 1 %}
+            {% set end = (productos.page - 1) * productos.per_page + (productos.items|length) %}
+            Mostrando {{ start }}–{{ end }} de {{ productos.total }} producto(s) | Página {{ productos.page }} de {{ productos.pages }}
+          {% else %}
+            Mostrando {{ productos.items|length }} producto(s)
+          {% endif %}
+        </div>
+
+        <!-- ─── Paginación ─── -->
+        {% if productos.pages > 1 %}
+        <div class="px-4 py-3 border-top">
+          <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+              {% if productos.has_prev %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1{% if query %}&q={{ query }}{% endif %}">Primera</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ productos.prev_num }}{% if query %}&q={{ query }}{% endif %}" rel="prev">Anterior</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled"><span class="page-link">Primera</span></li>
+              <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+              {% endif %}
+              {% for page_num in productos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                  <li class="page-item {% if page_num == productos.page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ page_num }}{% if query %}&q={{ query }}{% endif %}">{{ page_num }}</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+              {% endfor %}
+              {% if productos.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ productos.next_num }}{% if query %}&q={{ query }}{% endif %}" rel="next">Siguiente</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ productos.pages }}{% if query %}&q={{ query }}{% endif %}">Última</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+              <li class="page-item disabled"><span class="page-link">Última</span></li>
+              {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- ─── Modal Importar Excel ─── -->
+<div class="modal fade" id="modalImportarExcel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-semibold">
+                    <i class="bi bi-upload me-2"></i>Importar Productos desde Excel
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="POST" action="{{ url_for('products.importar_excel') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Seleccionar archivo Excel</label>
+                        <input type="file" name="archivo" class="form-control" accept=".xlsx,.xls" required>
+                        <div class="form-text small">Solo archivos .xlsx o .xls</div>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        <h6 class="fw-semibold small mb-2"><i class="bi bi-info-circle me-1"></i>Formato esperado:</h6>
+                        <ul class="mb-0 ps-3">
+                            <li><strong>Columna A:</strong> SKU</li>
+                            <li><strong>Columna B:</strong> Nombre</li>
+                            <li><strong>Columna C:</strong> Precio</li>
+                        </ul>
+                        <small class="text-muted">La primera fila debe contener los encabezados.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="bi bi-upload me-1"></i> Importar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}"></script>
+<script>
+// Buscador de productos con el motor centralizado (mismo componente que el POS):
+// al elegir, fija el SKU y envia la busqueda al servidor (pagina 1).
+document.addEventListener('DOMContentLoaded', function() {
+  var input = document.getElementById("buscar-input");
+  if (!input || !window.AppOTSearch) return;
+
+  AppOTSearch.initProductSearch({
+    input: input,
+    results: '#sugerencias',
+    minLength: 2,
+    onSelect: function (p) {
+      input.value = p.sku || p.label || p.nombre || '';
+      var form = input.form;
+      if (!form) return;
+      var pageInput = form.querySelector('input[name="page"]');
+      if (!pageInput) {
+        pageInput = document.createElement('input');
+        pageInput.type = 'hidden';
+        pageInput.name = 'page';
+        form.appendChild(pageInput);
+      }
+      pageInput.value = '1';
+      form.submit();
+    }
+  });
+});
+</script>
+{% endblock %}

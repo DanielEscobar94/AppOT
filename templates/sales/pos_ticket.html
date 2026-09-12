@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ticket {{ venta.numero_factura or venta.id }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Estilos optimizados para impresora POS 80mm */
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      
+      @page {
+        margin: 0;
+        size: {{ pos_cfg.ticket_width|default('80') }}mm auto;
+      }
+      
+      body {
+        margin: 0;
+        padding: 0;
+        width: {{ pos_cfg.ticket_width|default('80') }}mm;
+        background: white;
+        font-weight: bold;
+      }
+      
+      /* Forzar impresión en blanco y negro */
+      * {
+        color: black !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      
+      #posTicketRoot {
+        width: {{ pos_cfg.ticket_width|default('80') }}mm;
+        max-width: {{ pos_cfg.ticket_width|default('80') }}mm;
+        margin: 0;
+        padding: 2mm;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+      }
+    }
+    
+    /* Estilos para vista previa en pantalla */
+    @media screen {
+      body {
+        background: #f0f0f0;
+      }
+      
+      #posTicketRoot {
+        max-width: {{ pos_cfg.ticket_width|default('80') }}mm;
+        font-size: {{ pos_cfg.font_size|default(12) }}px;
+      }
+    }
+    
+    /* Estilos generales */
+    #posTicketRoot {
+      font-family: 'Courier New', monospace;
+      line-height: 1.3;
+      color: #000 !important;
+      background: #fff !important;
+    }
+    
+    #posTicketRoot * {
+      color: #000 !important;
+      background: transparent !important;
+    }
+    
+    /* Eliminar todos los colores Bootstrap */
+    .text-primary, .text-secondary, .text-danger, .text-success, .text-warning, .text-info,
+    .bg-primary, .bg-secondary, .bg-danger, .bg-success, .bg-warning, .bg-info,
+    .border-primary, .border-secondary, .border-danger, .border-success, .border-warning {
+      color: #000 !important;
+      background: transparent !important;
+      border-color: #000 !important;
+    }
+    
+    .ticket-header {
+      text-align: center;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+      font-size: {{ pos_cfg.font_size|default(12) }}px;
+    }
+    
+    .ticket-separator {
+      border-top: 1px dashed #000;
+      margin: 8px 0;
+    }
+    
+    .ticket-total {
+      font-weight: bold;
+      font-size: {{ (pos_cfg.font_size|default(12) + 2) }}px;
+    }
+    
+    .ticket-footer {
+      text-align: center;
+      border-top: 1px dashed #000;
+      padding-top: 8px;
+      margin-top: 8px;
+      font-size: {{ (pos_cfg.font_size|default(12) - 1) }}px;
+    }
+  </style>
+</head>
+<body>
+
+{% block content %}
+{%- set detalles = detalles if (detalles is defined and detalles is not none) else [] -%}
+<div class="no-print text-end mb-3 pt-3 pe-3">
+  <button class="btn btn-dark me-2" id="btn-imprimir-ticket">
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+  <button class="btn btn-outline-dark" id="btn-cancelar-ticket">
+    <i class="bi bi-x-circle"></i> Cancelar
+  </button>
+</div>
+
+<div id="posTicketRoot" class="mx-auto bg-white p-3 border rounded-3 shadow-lg">
+  <!-- ENCABEZADO EMPRESA -->
+  <div style="text-align:center; border-bottom:1px dashed #000; padding-bottom:4px; margin-bottom:8px;">
+    {% if company_name and pos_cfg.show_company %}
+      <div style="font-size:{{ (pos_cfg.font_size|default(12) + 2) }}px; font-weight:bold;">{{ company_name }}</div>
+    {% else %}
+      <div style="font-size:{{ (pos_cfg.font_size|default(12) + 2) }}px; font-weight:bold;">Mi Empresa</div>
+    {% endif %}
+  </div>
+  
+  <!-- INFORMACIÓN PRINCIPAL: FECHA, TICKET, CLIENTE, DOCUMENTO, SUCURSAL -->
+  <div class="ticket-row">
+    <span>Fecha:</span>
+    <span>{{ venta.fecha|local_datetime }}</span>
+  </div>
+  <div class="ticket-row">
+    <span>Ticket:</span>
+    <span style="font-weight:bold;">{{ venta.numero_factura or venta.id }}</span>
+  </div>
+  <div class="ticket-row">
+    <span>Cliente:</span>
+    <span>{{ venta.cliente.nombre if venta.cliente else 'CONSUMIDOR' }}</span>
+  </div>
+  {% if venta.cliente %}
+  <div class="ticket-row">
+    <span>Documento:</span>
+    <span>{{ venta.cliente.cc or venta.cliente.nit or '—' }}</span>
+  </div>
+  {% endif %}
+  {% if venta.branch %}
+  <div class="ticket-row">
+    <span>Sucursal:</span>
+    <span>{{ venta.branch.nombre }}</span>
+  </div>
+  {% endif %}
+
+  <!-- SEPARADOR -->
+  <div style="text-align:center; border-bottom:1px dashed #000; margin:8px 0; padding-bottom:4px;">---</div>
+
+  <!-- ORDEN DE TRABAJO (si existe) -->
+  {% if venta.orden %}
+  <div style="text-align:center; font-weight:bold; font-size:{{ (pos_cfg.font_size|default(12) + 1) }}px; margin-bottom:6px;">ORDEN DE TRABAJO</div>
+  <div class="ticket-row">
+    <span>N° Orden:</span>
+    <span style="font-weight:bold;">{{ venta.orden.consecutivo or ('#' ~ venta.orden.id) }}</span>
+  </div>
+  <div class="ticket-row">
+    <span>Estado:</span>
+    <span style="font-weight:bold;">{{ 'Finalizado' if venta.orden.estado == 'facturado' else (venta.orden.estado|title if venta.orden.estado else '—') }}</span>
+  </div>
+  {% if venta.orden.tecnico %}
+  <div class="ticket-row">
+    <span>Tecnico:</span>
+    <span>{{ venta.orden.tecnico.username }}</span>
+  </div>
+  {% elif venta.branch %}
+  <div class="ticket-row">
+    <span>Tecnico:</span>
+    <span>{{ venta.branch.nombre }}</span>
+  </div>
+  {% endif %}
+  {% endif %}
+  
+  <!-- SEPARADOR -->
+  <div style="text-align:center; border-bottom:1px dashed #000; margin:8px 0; padding-bottom:4px;">---</div>
+
+  <!-- PRODUCTOS/ARTÍCULOS -->
+  <div style="margin:8px 0;">
+    {% if venta.orden_id and venta.orden and venta.orden.articulos_json %}
+      {# Mostrar artículos agrupados por orden de trabajo #}
+      {% set articulos = venta.orden.articulos_json | fromjson %}
+      {% for articulo in articulos %}
+        <div style="margin-bottom:8px;">
+          <div style="font-weight:bold; font-size:{{ (pos_cfg.font_size|default(12)) }}px;">
+            Articulo {{ loop.index }}: {{ articulo.tipo | upper }}
+            {% if articulo.marca %} - {{ articulo.marca }}{% endif %}
+          </div>
+          {% for prod in articulo.productos %}
+            <div class="ticket-row" style="font-size:{{ (pos_cfg.font_size|default(12) - 1) }}px; margin-top:2px;">
+              <span>{{ prod.cantidad }} x ${{ "{:,}".format(prod.precio|int).replace(",", ".") }}</span>
+              <span style="font-weight:bold;">${{ "{:,}".format(((prod.precio * prod.cantidad) * (1 - prod.descuento / 100))|int).replace(",", ".") }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% else %}
+      {# Mostrar productos tradicionales (sin agrupación) #}
+      {% for it in detalles %}
+      <div style="margin-bottom:6px;">
+        <div style="font-weight:bold;">{{ it.get_nombre_display() }}</div>
+        <div class="ticket-row" style="font-size:{{ (pos_cfg.font_size|default(12) - 1) }}px; margin-top:2px;">
+          <span>{{ it.cantidad }} x ${{ "{:,}".format(it.precio_unitario|int).replace(",", ".") }}</span>
+          <span style="font-weight:bold;">${{ "{:,}".format((it.cantidad * it.precio_unitario)|int).replace(",", ".") }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- SEPARADOR -->
+  <div style="text-align:center; border-bottom:1px dashed #000; margin:8px 0; padding-bottom:4px;">---</div>
+  
+  <!-- ANTICIPOS (si existen) -->
+  {% if venta.anticipos and venta.anticipos|length > 0 %}
+  <div style="margin-bottom:8px;">
+    <div style="font-weight:bold; margin-bottom:4px;">Anticipos:</div>
+    {% for a in venta.anticipos %}
+    <div class="ticket-row" style="font-size:{{ (pos_cfg.font_size|default(12) - 1) }}px; margin-left:8px; margin-bottom:2px;">
+      <span>{{ a.metodo_pago or 'Efectivo' }}</span>
+      <span>${{ "{:,}".format(a.monto|int).replace(",", ".") }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  
+  <!-- SEPARADOR -->
+  <div style="text-align:center; border-bottom:1px dashed #000; margin:8px 0; padding-bottom:4px;">---</div>
+  {% endif %}
+
+  <!-- TOTALES -->
+  {% set detalles_total = 0 %}
+  {% for it in detalles %}
+    {% set detalles_total = detalles_total + (it.cantidad * it.precio_unitario) %}
+  {% endfor %}
+  {% if detalles_total and (detalles_total|int) != (venta.total|int) %}
+    {% set displayed_total = detalles_total %}
+  {% else %}
+    {% set displayed_total = venta.total or detalles_total %}
+  {% endif %}
+
+  {# Calcular descuento y anticipos de forma segura #}
+  {% set descuento_val = (venta.descuento|int) if (venta.descuento is not none) else 0 %}
+  {% set anticipo_val = (venta.anticipo_total|int) if (venta.anticipo_total is not none) else 0 %}
+  {% set total_a_pagar = displayed_total - descuento_val - anticipo_val %}
+  {% if total_a_pagar < 0 %}
+    {% set total_a_pagar = 0 %}
+  {% endif %}
+
+  <div class="ticket-row ticket-total">
+    <span>TOTAL DEL SERVICIO:</span>
+    <span>${{ "{:,}".format(displayed_total|int).replace(",", ".") }}</span>
+  </div>
+
+  {% if anticipo_val and anticipo_val > 0 %}
+  <div class="ticket-row">
+    <span>Abono anterior:</span>
+    <span>-${{ "{:,}".format(anticipo_val|int).replace(",", ".") }}</span>
+  </div>
+  {% endif %}
+
+  <div class="ticket-row ticket-total" style="border-top: 1px dashed #000; padding-top: 4px; margin-top: 4px;">
+    <span>A PAGAR HOY:</span>
+    <span>${{ "{:,}".format(total_a_pagar|int).replace(",", ".") }}</span>
+  </div>
+
+  {# Mostrar Estado solo si hay OT asociada #}
+  {% if venta.orden %}
+  <div class="ticket-row" style="font-size:{{ (pos_cfg.font_size|default(12) - 1) }}px; margin-top: 4px;">
+    <span>Estado:</span>
+    <span>{{ 'Finalizado' if venta.orden.estado == 'facturado' else (venta.estado_pago|capitalize) }}</span>
+  </div>
+  {% endif %}
+
+  <!-- SEPARADOR -->
+  <div style="text-align:center; border-bottom:1px dashed #000; margin:8px 0; padding-bottom:4px;">---</div>
+
+  <!-- PIE DE PAGINA -->
+  <div style="text-align:center; border-top:1px dashed #000; padding-top:8px; margin-top:8px; font-size:{{ (pos_cfg.font_size|default(12) - 1) }}px;">
+    <div>Gracias por su compra</div>
+    <div>PBX: 604 444 08 01</div>
+    <div>www.servipilas.com</div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const btnImprimir = document.getElementById('btn-imprimir-ticket');
+  const btnCancelar = document.getElementById('btn-cancelar-ticket');
+  
+  if (btnImprimir) {
+    btnImprimir.addEventListener('click', function() {
+      window.print();
+      setTimeout(function() {
+        window.close();
+      }, 500);
+    });
+  }
+  
+  if (btnCancelar) {
+    btnCancelar.addEventListener('click', function() {
+      window.close();
+    });
+  }
+  
+  // Auto-imprimir si está configurado
+  {% if pos_cfg.auto_print %}
+  setTimeout(function() {
+    window.print();
+  }, 500);
+  
+  window.onafterprint = function() {
+    window.close();
+  };
+  {% endif %}
+});
+</script>
+{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% block title %}Ordenes de Trabajo{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- ─── Header ─── -->
+    <div class="bg-dark text-white bg-gradient px-4 py-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-clipboard-data" style="color:#818cf8;"></i>
+            Órdenes de Trabajo
+          </h4>
+          <p class="mb-0 small opacity-50">Gestión de órdenes de servicio</p>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="d-flex gap-1">
+            <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-outline-primary {% if not finalizadas and not facturadas %}active{% endif %}">Activas</a>
+            <a href="{{ url_for('ordenes.listar_finalizadas') }}" class="btn btn-outline-primary {% if finalizadas %}active{% endif %}">Finalizadas</a>
+            <a href="{{ url_for('ordenes.listar_facturadas') }}" class="btn btn-outline-primary {% if facturadas %}active{% endif %}">Facturadas</a>
+          </div>
+          <a href="{{ url_for('ordenes.crear_orden') }}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Crear
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Filtros ─── -->
+    <div class="bg-light px-4 py-3 border-bottom">
+      <form id="filtros-form" method="get" class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Sucursal</label>
+          <select name="sucursal" id="sucursal" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for s in Branch.query.order_by(Branch.nombre).all() %}
+              <option value="{{ s.id }}" {% if request.args.get('sucursal') == (s.id|string) %}selected{% endif %}>{{ s.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Sitio Reparación</label>
+          <select name="sitio_reparacion" id="sitio_reparacion" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for u in sitios_reparacion %}
+              <option value="{{ u.id }}" {% if request.args.get('sitio_reparacion') == (u.id|string) %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Cliente</label>
+          <input type="text" id="buscar-cliente" class="form-control form-control-sm" placeholder="Buscar cliente" autocomplete="off" value="{{ request.args.get('cliente_nombre', '') }}">
+          <input type="hidden" name="cliente_nombre" id="cliente-nombre-hidden" value="{{ request.args.get('cliente_nombre', '') }}">
+          <input type="hidden" name="cliente_id" id="cliente-id">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Inicial</label>
+          <input type="text" name="fecha_inicio" id="fecha_inicio" class="form-control form-control-sm datepicker" value="{{ request.args.get('fecha_inicio', '') }}" placeholder="dd/mm/yyyy">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Final</label>
+          <input type="text" name="fecha_fin" id="fecha_fin" class="form-control form-control-sm datepicker" value="{{ request.args.get('fecha_fin', '') }}" placeholder="dd/mm/yyyy">
+        </div>
+        <div class="col-md-1">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">N° Orden</label>
+          <input type="text" name="orden" id="orden" class="form-control form-control-sm" value="{{ request.args.get('orden', '') }}" placeholder="Ej: 123">
+        </div>
+        <div class="col-md-1 d-flex gap-1">
+          <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i></button>
+          <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-x-circle"></i></a>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── Tabla ─── -->
+    {% if not ajax %}
+    <div id="tabla-ordenes" class="p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th># Orden</th>
+              <th>Cliente</th>
+              <th>Sucursal</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              {% if facturadas or ventas %}<th>Factura</th>{% endif %}
+              <th>Sitio Reparación</th>
+              <th>Responsable</th>
+              <th>Creada por</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for orden in ordenes %}
+            <tr>
+              <td class="fw-semibold">{{ orden.consecutivo or orden.generar_consecutivo() }}</td>
+              <td>{{ orden.client.nombre }}</td>
+              <td><span class="badge bg-secondary">{{ orden.branch.nombre }}</span></td>
+              <td class="small">{{ orden.fecha_creacion|local_datetime if orden.fecha_creacion else '—' }}</td>
+              <td>{% if facturadas %}<span class="badge bg-success">Facturada</span>{% else %}{{ orden.estado_servicio }}{% endif %}</td>
+              {% if facturadas or ventas %}<td>{% if orden.venta_rel %}FAC-{{ orden.venta_rel.numero_factura }}{% else %}—{% endif %}</td>{% endif %}
+              <td>{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+              <td>{{ orden.responsable_nombre or '—' }}</td>
+              <td>{{ orden.created_by.username if orden.created_by else '—' }}</td>
+              <td class="text-center">
+                <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-info border-0" title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" class="text-center py-4 text-muted">{% if finalizadas %}No se encontraron órdenes finalizadas.{% else %}No se encontraron órdenes.{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div id="tabla-ordenes" class="p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th># Orden</th>
+              <th>Cliente</th>
+              <th>Sucursal</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              {% if facturadas or ventas %}<th>Factura</th>{% endif %}
+              <th>Sitio Reparación</th>
+              <th>Responsable</th>
+              <th>Creada por</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for orden in ordenes %}
+            <tr>
+              <td class="fw-semibold">{{ orden.consecutivo or orden.generar_consecutivo() }}</td>
+              <td>{{ orden.client.nombre }}</td>
+              <td><span class="badge bg-secondary">{{ orden.branch.nombre }}</span></td>
+              <td class="small">{{ orden.fecha_creacion|local_datetime if orden.fecha_creacion else '—' }}</td>
+              <td>{% if facturadas %}<span class="badge bg-success">Facturada</span>{% else %}{{ orden.estado_servicio }}{% endif %}</td>
+              {% if facturadas or ventas %}
+                <td>{{ ventas[orden.id].numero_factura if ventas and ventas.get(orden.id) else (orden.venta_rel.numero_factura if getattr(orden, 'venta_rel', None) else '—') }}</td>
+              {% endif %}
+              <td>{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+              <td>{{ orden.responsable_nombre or '—' }}</td>
+              <td>{{ orden.created_by.username if orden.created_by else '—' }}</td>
+              <td class="text-center">
+                <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-info border-0" title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" class="text-center py-4 text-muted">No se encontraron órdenes.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ─── Contador ─── -->
+    {% if ordenes_pagination is defined and ordenes_pagination.total > 0 %}
+    <div class="px-4 py-2 border-top text-muted small">
+      {% set start = (ordenes_pagination.page - 1) * ordenes_pagination.per_page + 1 %}
+      {% set end = (ordenes_pagination.page - 1) * ordenes_pagination.per_page + (ordenes|length) %}
+      Mostrando {{ start }}–{{ end }} de {{ ordenes_pagination.total }} orden(es) | Página {{ ordenes_pagination.page }} de {{ ordenes_pagination.pages }}
+    </div>
+    {% endif %}
+
+    <!-- ─── Paginación ─── -->
+    {% if ordenes_pagination is defined and ordenes_pagination.pages > 1 %}
+    <div class="px-4 pb-3">
+      {% set qparam = [] %}
+      {% if request.args.get('sucursal') %}
+        {% set _ = qparam.append('sucursal=' ~ request.args.get('sucursal')) %}
+      {% endif %}
+      {% if request.args.get('cliente_nombre') %}
+        {% set _ = qparam.append('cliente_nombre=' ~ request.args.get('cliente_nombre')|urlencode) %}
+      {% endif %}
+      {% if request.args.get('cliente_id') %}
+        {% set _ = qparam.append('cliente_id=' ~ request.args.get('cliente_id')) %}
+      {% endif %}
+      {% if request.args.get('fecha_inicio') %}
+        {% set _ = qparam.append('fecha_inicio=' ~ request.args.get('fecha_inicio')|urlencode) %}
+      {% endif %}
+      {% if request.args.get('fecha_fin') %}
+        {% set _ = qparam.append('fecha_fin=' ~ request.args.get('fecha_fin')|urlencode) %}
+      {% endif %}
+      {% if request.args.get('orden') %}
+        {% set _ = qparam.append('orden=' ~ request.args.get('orden')|urlencode) %}
+      {% endif %}
+      {% if request.args.get('sitio_reparacion') %}
+        {% set _ = qparam.append('sitio_reparacion=' ~ request.args.get('sitio_reparacion')) %}
+      {% endif %}
+      {% set qparam_str = qparam|join('&') %}
+      {% set qs = ('&' ~ qparam_str) if qparam_str else '' %}
+
+      <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+        {% if ordenes_pagination.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1{{ qs }}">Primera</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ordenes_pagination.prev_num }}{{ qs }}">Anterior</a>
+        </li>
+        {% endif %}
+        {% for page_num in ordenes_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if page_num %}
+            <li class="page-item {% if page_num == ordenes_pagination.page %}active{% endif %}">
+              <a class="page-link" href="?page={{ page_num }}{{ qs }}">{{ page_num }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        {% if ordenes_pagination.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ordenes_pagination.next_num }}{{ qs }}">Siguiente</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ordenes_pagination.pages }}{{ qs }}">Última</a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Buscador de clientes con el motor centralizado (mismo componente que
+  // /clients y el POS): al elegir se envia el filtro al servidor.
+  if (!window.AppOTSearch) return;
+  var clientInput = document.getElementById('buscar-cliente');
+  var hiddenClientName = document.getElementById('cliente-nombre-hidden');
+  if (!clientInput || !hiddenClientName) return;
+
+  AppOTSearch.initClientSearch({
+    input: clientInput,
+    results: null, // el motor crea el contenedor junto al input
+    minLength: 2,
+    onSelect: function (client) {
+      var name = client.nombre || client.label || '';
+      clientInput.value = name;
+      hiddenClientName.value = name;
+      var form = clientInput.closest('form');
+      if (form) form.submit();
+    }
+  });
+
+  // Escribir sin elegir mantiene el filtro de texto para el servidor
+  clientInput.addEventListener('input', function() {
+    hiddenClientName.value = this.value;
+  });
+});
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}"></script>
+{% endblock %}

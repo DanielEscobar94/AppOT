@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Historial de Exportaciones Siigo
+    </h2>
+    <a href="{{ url_for('salidas.listar') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver a Salidas
+    </a>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros</h5>
+    </div>
+    <div class="card-body">
+      <form method="GET">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Estado</label>
+            <select name="estado" class="form-select">
+              <option value="">Todos los estados</option>
+              {% for estado in estados %}
+                <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>
+                  {% if estado == 'pendiente' %}🟡 Pendiente
+                  {% elif estado == 'procesado' %}🟢 Procesado
+                  {% elif estado == 'cancelado' %}🔴 Cancelado
+                  {% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Sucursal</label>
+            <select name="sucursal_id" class="form-select">
+              <option value="">Todas las sucursales</option>
+              {% for s in sucursales %}
+                <option value="{{ s.id }}" {% if sucursal_filtro == s.id %}selected{% endif %}>
+                  {{ s.nombre }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Filtrar
+            </button>
+            <a href="{{ url_for('salidas.historial_exportaciones') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-circle"></i> Limpiar
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabla de exportaciones -->
+  <div class="card">
+    <div class="card-header bg-dark text-white d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+      <h5 class="mb-0">Exportaciones Realizadas</h5>
+    </div>
+    <div class="card-body p-0">
+      {% if exportaciones %}
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Fecha Exportacion</th>
+                <th>Periodo</th>
+                <th>Sucursal</th>
+                <th>Archivo</th>
+                <th>Registros</th>
+                <th>Valor Total</th>
+                <th>Estado</th>
+                <th>OK Siigo</th>
+                <th>Usuario</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for exp in exportaciones %}
+              <tr>
+                <td class="fw-bold text-primary">EXP{{ "%04d"|format(exp.id) }}</td>
+                <td>{{ exp.fecha_exportacion|local_datetime }}</td>
+                <td>
+                  <small>
+                    {% if exp.fecha_desde and exp.fecha_hasta %}
+                      {{ exp.fecha_desde|local_date }} - {{ exp.fecha_hasta|local_date }}
+                    {% elif exp.fecha_desde %}
+                      Desde {{ exp.fecha_desde|local_date }}
+                    {% elif exp.fecha_hasta %}
+                      Hasta {{ exp.fecha_hasta|local_date }}
+                    {% else %}
+                      Todo el periodo
+                    {% endif %}
+                  </small>
+                </td>
+                <td>
+                  {% if exp.sucursal %}
+                    <span class="badge bg-secondary">{{ exp.sucursal.nombre }}</span>
+                  {% else %}
+                    <span class="text-muted">Todas</span>
+                  {% endif %}
+                </td>
+                <td class="text-break">
+                  <small class="text-monospace text-break">{{ exp.archivo_excel }}</small>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-info">{{ exp.total_registros }}</span>
+                </td>
+                <td class="text-end fw-bold">${{ "{:,.0f}".format(exp.valor_total|float).replace(",", ".") }}</td>
+                <td>
+                  {% if exp.estado.value == 'pendiente' %}
+                    <span class="badge bg-warning text-dark">🟡 Pendiente</span>
+                  {% elif exp.estado.value == 'procesado' %}
+                    <span class="badge bg-success">🟢 Procesado</span>
+                  {% elif exp.estado.value == 'cancelado' %}
+                    <span class="badge bg-danger">🔴 Cancelado</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if exp.estado.value == 'pendiente' %}
+                    <div class="d-flex align-items-center gap-1">
+                      <input type="text" class="form-control form-control-sm ok-siigo-input" 
+                             style="width: 120px;" placeholder="OK Siigo..."
+                             data-exportacion-id="{{ exp.id }}"
+                             value="{{ exp.numero_ok_siigo or '' }}">
+                      <button class="btn btn-sm btn-success guardar-ok-btn" 
+                              data-exportacion-id="{{ exp.id }}"
+                              title="Guardar OK Siigo">
+                        <i class="bi bi-check"></i>
+                      </button>
+                    </div>
+                  {% else %}
+                    <span class="fw-bold text-success">{{ exp.numero_ok_siigo or '—' }}</span>
+                    {% if exp.fecha_procesado %}
+                      <br><small class="text-muted">{{ exp.fecha_procesado|local_datetime }}</small>
+                    {% endif %}
+                  {% endif %}
+                </td>
+                <td>
+                  <small>{{ exp.usuario.username or exp.usuario.email }}</small>
+                </td>
+                <td>
+                  <div class="btn-group-vertical btn-group-sm">
+                    {% if exp.estado.value == 'pendiente' %}
+                      <button class="btn btn-outline-danger btn-sm cancelar-btn" 
+                              data-exportacion-id="{{ exp.id }}"
+                              title="Cancelar exportacion">
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    {% endif %}
+                    <button class="btn btn-outline-info btn-sm ver-detalle-btn" 
+                            data-exportacion-id="{{ exp.id }}"
+                            title="Ver observaciones">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center p-5">
+          <i class="bi bi-inbox display-1 text-muted"></i>
+          <h4 class="text-muted mt-3">No hay exportaciones</h4>
+          <p class="text-muted">No se encontraron exportaciones con los filtros aplicados.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar guardado de OK Siigo
+    document.querySelectorAll('.guardar-ok-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const exportacionId = this.dataset.exportacionId;
+            const input = this.parentElement.querySelector('.ok-siigo-input');
+            const numeroOk = input.value.trim();
+            
+            if (!numeroOk) {
+                alert('Por favor ingresa un numero OK de Siigo');
+                return;
+            }
+            
+            // Deshabilitar boton
+            this.disabled = true;
+            this.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+            
+            // Enviar al servidor
+            const baseUrl = "{{ url_for('salidas.actualizar_ok_siigo', exportacion_id=1) }}";
+            const url = baseUrl.replace('/1', '/' + exportacionId);
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    numero_ok_siigo: numeroOk
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Recargar pagina para mostrar cambios
+                    location.reload();
+                } else {
+                    throw new Error(data.message || 'Error al guardar');
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-check"></i>';
+            });
+        });
+    });
+    
+    // Permitir guardar con Enter
+    document.querySelectorAll('.ok-siigo-input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const btn = this.parentElement.querySelector('.guardar-ok-btn');
+                btn.click();
+            }
+        });
+    });
+    
+    // Boton Ver detalles
+    document.querySelectorAll('.ver-detalle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const exportacionId = this.getAttribute('data-exportacion-id');
+            
+            // Buscar la fila correspondiente
+            const row = this.closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            // Extraer informacion de la fila
+            const info = {
+                id: cells[0].textContent.trim(),
+                fecha: cells[1].textContent.trim(),
+                periodo: cells[2].textContent.trim(),
+                sucursal: cells[3].textContent.trim(),
+                archivo: cells[4].textContent.trim(),
+                registros: cells[5].textContent.trim(),
+                valorTotal: cells[6].textContent.trim(),
+                estado: cells[7].textContent.trim(),
+                okSiigo: cells[8].textContent.trim(),
+                usuario: cells[9].textContent.trim()
+            };
+            
+            // Crear contenido del modal
+            const modalContent = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Informacion General</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>ID:</strong></td><td>${info.id}</td></tr>
+                            <tr><td><strong>Fecha:</strong></td><td>${info.fecha}</td></tr>
+                            <tr><td><strong>Periodo:</strong></td><td>${info.periodo}</td></tr>
+                            <tr><td><strong>Sucursal:</strong></td><td>${info.sucursal}</td></tr>
+                            <tr><td><strong>Usuario:</strong></td><td>${info.usuario}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Datos de Exportacion</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Archivo:</strong></td><td class="text-break">${info.archivo}</td></tr>
+                            <tr><td><strong>Registros:</strong></td><td>${info.registros}</td></tr>
+                            <tr><td><strong>Valor Total:</strong></td><td>${info.valorTotal}</td></tr>
+                            <tr><td><strong>Estado:</strong></td><td>${info.estado}</td></tr>
+                            <tr><td><strong>OK Siigo:</strong></td><td>${info.okSiigo}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            // Mostrar modal
+            showModal('Detalles de Exportacion', modalContent);
+        });
+    });
+});
+
+// Funcion para mostrar modal
+function showModal(title, content) {
+    // Crear modal si no existe
+    let modal = document.getElementById('detalleModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade" id="detalleModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body"></div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal.firstElementChild);
+        modal = document.getElementById('detalleModal');
+    }
+    
+    // Actualizar contenido
+    modal.querySelector('.modal-title').textContent = title;
+    modal.querySelector('.modal-body').innerHTML = content;
+    
+    // Mostrar modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+  }
+
+  // Agregar funcionalidad de confirmacion para cancelar exportacion
+  document.addEventListener('DOMContentLoaded', function() {
+    // Crear modal de confirmacion si no existe
+    let confirmModal = document.getElementById('confirmCancelModal');
+    if (!confirmModal) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `
+        <div class="modal fade" id="confirmCancelModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p id="confirmCancelMessage">¿Estás seguro de eliminar este registro de exportación? Esta acción es irreversible.</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrapper.firstElementChild);
+      confirmModal = document.getElementById('confirmCancelModal');
+    }
+
+    let exportacionToCancel = null;
+
+    // Manejar clicks en botones cancelar
+    document.querySelectorAll('.cancelar-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        exportacionToCancel = this.getAttribute('data-exportacion-id');
+        // Personalizar mensaje con ID
+        const msgEl = document.getElementById('confirmCancelMessage');
+        if (msgEl) msgEl.textContent = `¿Estás seguro de eliminar el registro EXP${String(exportacionToCancel).padStart(4,'0')}? Esta acción es irreversible.`;
+        const modalInstance = new bootstrap.Modal(confirmModal);
+        modalInstance.show();
+      });
+    });
+
+    // Confirmar eliminacion
+    const confirmBtn = document.getElementById('confirmCancelBtn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function() {
+        if (!exportacionToCancel) return;
+        // Deshabilitar boton mientras se procesa
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Eliminando...';
+
+        const baseUrl = "{{ url_for('salidas.cancelar_exportacion', exportacion_id=1) }}";
+        const url = baseUrl.replace('/1', '/' + exportacionToCancel);
+        fetch(url, { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              alert('Error: ' + (data.message || 'No se pudo eliminar'));
+            }
+          })
+          .catch(err => {
+            alert('Error al eliminar: ' + err.message);
+          })
+          .finally(() => {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Eliminar';
+          });
+      });
+    }
+  });
+
+  </script>
+  {% endblock %}

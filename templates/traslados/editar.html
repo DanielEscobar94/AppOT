@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Traslado{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-pencil-square"></i> Editar Traslado #{{ traslado.numero_traslado_siigo }}</h2>
+        <div>
+            <a href="{{ url_for('traslados.ver', id=traslado.id) }}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-eye"></i> Ver Detalle
+            </a>
+            <a href="{{ url_for('traslados.listar') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('traslados.editar', id=traslado.id) }}" id="formTraslado">
+        {{ form.hidden_tag() }}
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4 bg-light">
+                <div class="row g-3">
+                    <!-- Primera fila -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-hash text-primary"></i> No. Traslado Siigo *
+                        </label>
+                        {{ form.numero_traslado_siigo(class="form-control", placeholder="Ej: T-2026-001") }}
+                        {% if form.numero_traslado_siigo.errors %}
+                            <div class="text-danger small mt-1">{{ form.numero_traslado_siigo.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-calendar-event text-primary"></i> Fecha del Traslado *
+                        </label>
+                        {{ form.fecha(class="form-control", type="datetime-local") }}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-person-badge text-primary"></i> Responsable *
+                        </label>
+                        {{ form.responsable(class="form-control", placeholder="Nombre del responsable") }}
+                    </div>
+
+                    <!-- Segunda fila -->
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-box-arrow-right text-danger"></i> Sale de (Bodega Origen) *
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-danger text-white"><i class="bi bi-shop"></i></span>
+                            {{ form.branch_origen_id(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end justify-content-center pb-2">
+                        <div class="badge bg-primary rounded-circle p-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-arrow-right" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-box-arrow-in-left text-success"></i> Entra a (Bodega Destino) *
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-success text-white"><i class="bi bi-shop"></i></span>
+                            {{ form.branch_destino_id(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <!-- Tercera fila -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-chat-left-text text-primary"></i> Observación
+                        </label>
+                        {{ form.observacion(class="form-control", rows="2", placeholder="Información adicional sobre el traslado...") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-center gap-3 mb-5">
+            <a href="{{ url_for('traslados.ver', id=traslado.id) }}" class="btn btn-secondary btn-lg px-5">
+                <i class="bi bi-x-circle"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg px-5">
+                <i class="bi bi-check-circle"></i> Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .card {
+        border-radius: 10px;
+        border: none;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .input-group-text {
+        border: none;
+    }
+    
+    .badge {
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Datos de la empresa</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">{{ form.name.label }}</label>
+        {{ form.name(class_='form-control') }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ form.phone.label }}</label>
+        {{ form.phone(class_='form-control') }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.address.label }}</label>
+        {{ form.address(class_='form-control') }}
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary ms-2">Cancelar</a>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

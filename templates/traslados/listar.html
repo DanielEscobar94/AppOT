@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Traslados entre Bodegas{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+        <!-- ─── Header ─── -->
+        <div class="bg-dark text-white bg-gradient px-4 py-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-left-right" style="color:#818cf8;"></i>
+                        Traslados entre Bodegas
+                    </h4>
+                    <p class="mb-0 small opacity-50">Gestión de movimientos de inventario entre sucursales</p>
+                </div>
+                <a href="{{ url_for('traslados.crear') }}" class="btn btn-light">
+                    <i class="bi bi-plus-lg me-1"></i> Nuevo Traslado
+                </a>
+            </div>
+        </div>
+
+        <!-- ─── Filtros ─── -->
+        <div class="bg-light px-4 py-3 border-bottom">
+            <form method="GET" action="{{ url_for('traslados.listar') }}" class="row g-2 align-items-end">
+                <div class="col-lg-2 col-md-4">
+                    <label class="small text-uppercase text-muted fw-semibold mb-1">No. Traslado</label>
+                    <input type="text" name="numero_traslado" class="form-control form-control-sm"
+                           value="{{ filtros.numero_traslado }}" placeholder="Buscar...">
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="small text-uppercase text-muted fw-semibold mb-1">Origen</label>
+                    <select name="branch_origen_id" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" {% if filtros.branch_origen_id == sucursal.id %}selected{% endif %}>
+                            {{ sucursal.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="small text-uppercase text-muted fw-semibold mb-1">Destino</label>
+                    <select name="branch_destino_id" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" {% if filtros.branch_destino_id == sucursal.id %}selected{% endif %}>
+                            {{ sucursal.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="small text-uppercase text-muted fw-semibold mb-1">Desde</label>
+                    <input type="date" name="fecha_inicio" class="form-control form-control-sm"
+                           value="{{ filtros.fecha_inicio }}">
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="small text-uppercase text-muted fw-semibold mb-1">Hasta</label>
+                    <input type="date" name="fecha_fin" class="form-control form-control-sm"
+                           value="{{ filtros.fecha_fin }}">
+                </div>
+                <div class="col-lg-2 col-md-4 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Buscar">
+                        <i class="bi bi-search me-1"></i> Buscar
+                    </button>
+                    <a href="{{ url_for('traslados.listar') }}" class="btn btn-outline-secondary btn-sm flex-fill" title="Limpiar">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- ─── Tabla ─── -->
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted fw-semibold">
+                    <tr>
+                        <th class="ps-4">No. Traslado</th>
+                        <th>Fecha</th>
+                        <th>Ruta</th>
+                        <th>Observación</th>
+                        <th>Estado</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="table-group-divider">
+                    {% if traslados %}
+                        {% for traslado in traslados %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{{ url_for('traslados.ver', id=traslado.id) }}"
+                                   class="link-dark link-offset-1 link-underline-opacity-0 link-underline-opacity-100-hover fw-semibold">
+                                    {{ traslado.numero_traslado_siigo }}
+                                </a>
+                            </td>
+                            <td class="text-nowrap text-muted small">
+                                <i class="bi bi-calendar3 me-1 opacity-50"></i>
+                                {{ traslado.fecha.strftime('%d/%m/%Y %H:%M') }}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-1 fw-normal">
+                                        <i class="bi bi-box-arrow-right me-1"></i>{{ traslado.branch_origen.nombre }}
+                                    </span>
+                                    <i class="bi bi-chevron-right text-secondary small"></i>
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-1 fw-normal">
+                                        <i class="bi bi-box-arrow-in-left me-1"></i>{{ traslado.branch_destino.nombre }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="text-muted small">
+                                {{ traslado.observacion[:35] if traslado.observacion else '—' }}
+                            </td>
+                            <td>
+                                {% if traslado.estado == 'confirmado' %}
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="badge bg-success rounded-pill d-inline-flex align-items-center gap-1">
+                                        <i class="bi bi-check-circle"></i> Confirmado
+                                    </span>
+                                    <small class="text-muted d-none d-lg-inline">por {{ traslado.confirmado_por }}</small>
+                                </div>
+                                {% elif traslado.estado == 'anulado' %}
+                                <span class="badge bg-danger rounded-pill d-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-x-circle"></i> Anulado
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark rounded-pill d-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-clock-history"></i> Pendiente
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="{{ url_for('traslados.ver', id=traslado.id) }}"
+                                       class="btn btn-sm btn-outline-primary border-0" title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if traslado.estado != 'anulado' %}
+                                    <a href="{{ url_for('traslados.editar', id=traslado.id) }}"
+                                       class="btn btn-sm btn-outline-warning border-0" title="Editar">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    {% if current_user.rol in ('admin', 'supervisor') %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0"
+                                            title="Eliminar traslado"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalEliminar"
+                                            data-id="{{ traslado.id }}"
+                                            data-numero="{{ traslado.numero_traslado_siigo }}">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="text-center py-5">
+                                    <i class="bi bi-inbox fs-1 text-secondary d-block mb-3"></i>
+                                    <h6 class="fw-semibold text-secondary-emphasis">No hay traslados</h6>
+                                    <p class="text-muted small mb-0">No se encontraron traslados con los filtros actuales.</p>
+                                    <a href="{{ url_for('traslados.crear') }}" class="btn btn-primary btn-sm mt-3">
+                                        <i class="bi bi-plus-lg me-1"></i> Crear nuevo traslado
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ─── Contador ─── -->
+        <div class="px-4 py-2 border-top text-muted small">
+          {% if pagination.total > 0 %}
+            {% set start = (pagination.page - 1) * pagination.per_page + 1 %}
+            {% set end = (pagination.page - 1) * pagination.per_page + (pagination.items|length) %}
+            Mostrando {{ start }}–{{ end }} de {{ pagination.total }} registro(s) | Página {{ pagination.page }} de {{ pagination.pages }}
+          {% else %}
+            Mostrando {{ pagination.items|length }} registro(s)
+          {% endif %}
+        </div>
+
+        <!-- ─── Paginación ─── -->
+        {% if pagination.pages > 1 %}
+        <div class="px-4 pb-3">
+          <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+              {% if pagination.has_prev %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('traslados.listar', page=1, **filtros) }}">Primera</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('traslados.listar', page=pagination.prev_num, **filtros) }}" rel="prev">Anterior</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled"><span class="page-link">Primera</span></li>
+              <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+              {% endif %}
+              {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                  <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('traslados.listar', page=page_num, **filtros) }}">{{ page_num }}</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+              {% endfor %}
+              {% if pagination.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('traslados.listar', page=pagination.next_num, **filtros) }}" rel="next">Siguiente</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('traslados.listar', page=pagination.pages, **filtros) }}">Última</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+              <li class="page-item disabled"><span class="page-link">Última</span></li>
+              {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- ─── Modal Eliminar ─── -->
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-semibold">
+                    <i class="bi bi-trash3 me-2"></i>Eliminar Traslado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="POST" id="formEliminar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+                <div class="modal-body">
+                    <div class="d-flex gap-3">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-3 bg-danger bg-opacity-10 p-3 d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                                <i class="bi bi-exclamation-triangle text-danger fs-5"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="fw-semibold mb-1">¿Eliminar traslado <span class="text-primary" id="modal-numero-traslado"></span>?</p>
+                            <p class="text-muted small mb-0">Esta acción <strong>no se puede deshacer</strong>. Se eliminará el traslado y todos sus detalles asociados.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash3 me-1"></i> Confirmar Eliminación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('modalEliminar').addEventListener('show.bs.modal', function(event) {
+    const btn = event.relatedTarget;
+    document.getElementById('modal-numero-traslado').textContent = '#' + btn.getAttribute('data-numero');
+    document.getElementById('formEliminar').action = '/traslados/eliminar/' + btn.getAttribute('data-id');
+});
+</script>
+{% endblock %}

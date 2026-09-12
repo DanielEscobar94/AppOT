@@ -1,0 +1,48 @@
+{% extends 'ba    <tr>
+      <th>Nombre</th>
+      <th>SKU</th>
+  <th>Precio</th>
+      <th>Acciones</th>
+    </tr>' %}
+{% block content %}
+<h2 class="mb-4">Productos en Categoria: {{ categoria.nombre }}</h2>
+
+<p><strong>Total de productos:</strong> {{ total_productos }}</p>
+
+
+<div class="mb-3">
+  <a href="{{ url_for('products.listar') }}" class="btn btn-secondary">Volver al listado</a>
+  <a href="{{ url_for('products.exportar_categoria', categoria_id=categoria.id) }}" class="btn btn-outline-primary">Exportar CSV</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-bordered table-striped">
+    <thead class="table-dark">
+      <tr>
+        <th>Nombre</th>
+        <th>SKU</th>
+        <th>Precio</th>
+        <th>Stock</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in productos %}
+      <tr>
+        <td>{{ p.nombre }}</td>
+        <td>{{ p.sku }}</td>
+    <td>${{ (p.precio) | round(0) }}</td>
+        <td>
+          <a href="{{ url_for('products.editar', id=p.id) }}" class="btn btn-sm btn-warning">Editar</a>
+          <a href="{{ url_for('products.eliminar', id=p.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este producto?')">Eliminar</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" class="text-center">No hay productos registrados en esta categoria.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

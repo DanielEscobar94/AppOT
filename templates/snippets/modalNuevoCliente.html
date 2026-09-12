@@ -1,0 +1,63 @@
+<!-- Modal Nuevo Cliente (snippet reutilizable) -->
+<div class="modal fade" id="modalNuevoCliente" tabindex="-1" aria-labelledby="modalNuevoClienteLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+  <form id="formNuevoCliente" method="POST" action="/clients/crear_desde_modal">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title" id="modalNuevoClienteLabel"><i class="bi bi-person-plus"></i> Nuevo Cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Tipo de cliente</label>
+            <select name="tipo" id="tipo-cliente" class="form-select" required>
+              <option value="natural">Persona</option>
+              <option value="empresa">Empresa</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input type="text" name="nombre" class="form-control text-uppercase" required>
+          </div>
+          <div class="mb-3" id="campo-identificacion">
+            <label class="form-label" id="label-identificacion">Numero de identificacion</label>
+            <input type="text" name="cc" id="input-identificacion" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo</label>
+            <input type="email" name="correo" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Telefono</label>
+            <input type="text" name="telefono" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var tipoCliente = document.getElementById('tipo-cliente');
+  var labelIdentificacion = document.getElementById('label-identificacion');
+  var inputIdentificacion = document.getElementById('input-identificacion');
+  if (tipoCliente && labelIdentificacion && inputIdentificacion) {
+    tipoCliente.addEventListener('change', function() {
+      if (this.value === 'empresa') {
+        labelIdentificacion.textContent = 'NIT';
+        inputIdentificacion.setAttribute('name', 'nit');
+        inputIdentificacion.setAttribute('placeholder', 'NIT de la empresa');
+      } else {
+        labelIdentificacion.textContent = 'Numero de identificacion';
+        inputIdentificacion.setAttribute('name', 'cc');
+        inputIdentificacion.setAttribute('placeholder', 'Cedula o documento');
+      }
+    });
+  }
+});
+</script>

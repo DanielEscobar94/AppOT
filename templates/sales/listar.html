@@ -1,0 +1,13 @@
+{# Sales listing has been removed — redirect users to POS create page #}
+{% extends 'base.html' %}
+{% block content %}
+  <div class="container mt-4 text-center">
+    <h2 class="mb-4">POS</h2>
+    <p class="lead">La vista de listado de Ventas ha sido deshabilitada. Serás redirigido a la pantalla de POS.</p>
+    <a href="{{ url_for('sales.nueva') }}" class="btn btn-success">Ir a POS</a>
+  </div>
+  <script>
+    // Auto-redirect after short delay
+    setTimeout(function(){ window.location.href = '{{ url_for("sales.nueva") }}'; }, 1200);
+  </script>
+{% endblock %}

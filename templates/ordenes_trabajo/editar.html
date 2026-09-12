@@ -1,0 +1,1821 @@
+{% extends 'base.html' %}
+{% block title %}Editar Orden #{{ orden.consecutivo or orden.id }}{% endblock %}
+
+{% block content %}
+<style>
+  /* Estilos para el carrito de productos */
+  .hover-bg-light:hover {
+    background-color: #f8f9fa !important;
+    transition: background-color 0.2s ease;
+  }
+
+  #productos-articulo-lista {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  #productos-sugerencias {
+    z-index: 1060 !important;
+  }
+
+  #productos-sugerencias .list-group-item {
+    transition: all 0.2s ease;
+  }
+
+  #productos-sugerencias .list-group-item:hover {
+    background-color: #0d6efd !important;
+    color: white !important;
+  }
+
+  #productos-sugerencias .list-group-item.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+  }
+
+  /* Animación para productos agregados */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  #productos-articulo-lista>div {
+    animation: slideIn 0.3s ease;
+  }
+</style>
+
+<script>
+  // Definir sitios de reparación globalmente para el modal de artículos
+  window.sitiosReparacion = {{ sitios_reparacion | tojson | safe }};
+
+  // Poblar el select de sitios de reparación en el modal de artículos (igual que en crear.html)
+  document.addEventListener('DOMContentLoaded', function () {
+    const sitioSelect = document.getElementById('articulo-sitio');
+    if (sitioSelect && window.sitiosReparacion) {
+      sitioSelect.innerHTML = '<option value="">Selecciona sitio de reparación...</option>';
+      window.sitiosReparacion.forEach(function (sitio) {
+        const option = document.createElement('option');
+        option.value = sitio[0]; // ID
+        option.textContent = sitio[1]; // Nombre
+        sitioSelect.appendChild(option);
+      });
+    }
+  });
+</script>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card shadow-lg border-0 rounded-4">
+        <div class="card-header bg-primary text-white rounded-top-4">
+          <h3 class="mb-0"><i class="bi bi-clipboard-plus me-2"></i> Nueva Orden de Trabajo</h3>
+        </div>
+        <div class="card-body p-4">
+          <form method="POST" action="{{ url_for('ordenes.editar_orden', orden_id=orden.id) }}" id="form-crear-ot">
+            {{ form.csrf_token }}
+            <input type="hidden" name="client_id" id="client-id" value="{{ orden.client.id }}">
+            <!-- Campos ocultos para datos del cliente -->
+            <input type="hidden" name="cliente_cedula" id="cliente-cedula"
+              value="{{ orden.client.cc or orden.client.nit or '' }}">
+            <input type="hidden" name="cliente_telefono" id="cliente-telefono-hidden"
+              value="{{ orden.client.telefono or '' }}">
+
+            <!-- Cliente -->
+            <div class="row mb-4">
+              <div class="col-md-8 position-relative">
+                <label for="buscar-cliente" class="form-label">Cliente</label>
+                <input type="text" name="cliente_nombre" id="buscar-cliente"
+                  class="form-control border-primary shadow-sm clients-search-input"
+                  placeholder="Buscar cliente por nombre o ID" autocomplete="off" autocapitalize="off" autocorrect="off"
+                  spellcheck="false" value="{{ orden.client.nombre }}">
+                <div id="client-suggestions" class="clients-suggestions-container list-group shadow-sm"></div>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-primary w-100" data-bs-toggle="modal"
+                  data-bs-target="#modalNuevoCliente">
+                  <i class="bi bi-person-plus"></i> Agregar nuevo cliente
+                </button>
+              </div>
+            </div>
+
+            <!-- Datos del cliente seleccionado -->
+            <div id="datos-cliente" class="card mb-4" style="display: none;">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col-md-8">
+                    <h6 class="card-title mb-2">
+                      <i class="bi bi-person-circle"></i>
+                      <span id="cliente-nombre-display">Cliente</span>
+                    </h6>
+                    <div class="row">
+                      <div class="col-sm-6">
+                        <small class="text-muted">Documento:</small><br>
+                        <span id="cliente-documento" class="fw-bold">-</span>
+                      </div>
+                      <div class="col-sm-6" id="cliente-correo-container" style="display: none;">
+                        <small class="text-muted">Correo:</small><br>
+                        <span id="cliente-correo">-</span>
+                      </div>
+                    </div>
+                    <div class="row mt-1">
+                      <div class="col-sm-6" id="cliente-telefono-container" style="display: none;">
+                        <small class="text-muted">Teléfono:</small><br>
+                        <span id="cliente-telefono">-</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-4 text-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-editar-cliente"
+                      style="display: none;">
+                      <i class="bi bi-pencil"></i> Editar cliente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Artículos -->
+            <div class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold"><i class="bi bi-box-seam"></i> Artículos</h5>
+                <button type="button" class="btn btn-success btn-sm" id="btn-agregar-articulo" data-bs-toggle="modal"
+                  data-bs-target="#modalArticulo">
+                  <i class="bi bi-plus-circle"></i> Agregar Artículo
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle" id="tabla-articulos">
+                  <thead class="table-primary">
+                    <tr>
+                      <th>#</th>
+                      <th>Artículo</th>
+                      <th>Marca</th>
+                      <th>Referencia</th>
+                      <th>Descripción</th>
+                      <th>Productos/Servicios</th>
+                      <th class="text-end">Valor</th>
+                      <th class="text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="articulos-lista"></tbody>
+                </table>
+              </div>
+              <div class="mt-3 text-end">
+                <span class="fw-bold fs-4 text-success">Total artículos: $<span id="articulos-total">0</span></span>
+              </div>
+              <input type="hidden" name="articulos_json" id="articulos-json">
+            </div>
+
+            <!-- Total Final -->
+            <div id="total-final-container" style="display:none;" class="mb-4 p-3 bg-light border rounded">
+              <div class="row">
+                <div class="col-md-6">
+                  <p class="mb-1">Total artículos: <span class="fw-bold text-success">$<span
+                        id="total-articulos-display">0</span></span></p>
+                  <p class="mb-0">Total anticipos: <span class="fw-bold text-danger">-$<span
+                        id="total-anticipos-display">0</span></span></p>
+                </div>
+                <div class="col-md-6 text-end">
+                  <h4 class="mb-0">
+                    <span class="text-muted">Saldo pendiente:</span>
+                    <span class="fw-bold text-primary">$<span id="total-final">0</span></span>
+                  </h4>
+                </div>
+              </div>
+            </div>
+
+            <!-- Campos requeridos por WTForms (ocultos porque se manejan via artículos) -->
+            <div style="display: none;">
+              {{ form.categoria(id="categoria-hidden") }}
+              {{ form.referencia(id="referencia-hidden") }}
+              {{ form.descripcion(id="descripcion-hidden") }}
+            </div>
+
+            <!-- Sitio de reparación -->
+            <div class="mb-4">
+              <label for="tecnico_id" class="form-label">Sitio de reparación</label>
+              {{ form.tecnico_id(class="form-select", id="tecnico_id", required=True) }}
+              <div class="form-text">Selecciona donde se realizará la reparación.</div>
+            </div>
+
+            <!-- Repuestos Implementados -->
+            {% if True %}
+            <div class="mb-4">
+              <div class="card">
+                <div class="card-header bg-secondary text-white">
+                  <h5 class="mb-0"><i class="bi bi-wrench"></i> Repuestos Implementados</h5>
+                </div>
+                <div class="card-body">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-repuestos-internos">
+                    <i class="bi bi-plus-circle"></i> Administrar Repuestos
+                  </button>
+                  <small class="text-muted ms-2">Registra los repuestos utilizados en esta orden</small>
+                  
+                  {# Alerta en tiempo real si repuestos > servicios #}
+                  <div id="alerta-costo-repuestos" class="alert alert-danger mt-3 d-none">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>ADVERTENCIA:</strong> El costo de repuestos (<span id="costo-repuestos-total">$0</span>) supera el valor de servicios (<span id="valor-servicios-total">${{ '{:,.0f}'.format(total_servicios).replace(',', '.') }}</span>)
+                    <br><span id="diferencia-repuestos-servicio"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Anticipo -->
+            <div class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold"><i class="bi bi-cash-coin"></i> Anticipos</h5>
+                <button type="button" class="btn btn-success btn-sm" id="btn-agregar-anticipo">
+                  <i class="bi bi-plus-circle"></i> Agregar Anticipo
+                </button>
+              </div>
+
+              <!-- Lista de anticipos -->
+              <div id="anticipos-container" style="display:none;">
+                <div class="table-responsive">
+                  <table class="table table-hover table-sm align-middle">
+                    <thead class="table-success">
+                      <tr>
+                        <th>#</th>
+                        <th>Monto</th>
+                        <th>Método</th>
+                        <th>Factura Siigo</th>
+                        <th class="text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody id="anticipos-lista"></tbody>
+                  </table>
+                </div>
+                <div class="mt-2 text-end">
+                  <span class="fw-bold text-success">Total anticipos: $<span id="anticipos-total">0</span></span>
+                </div>
+              </div>
+
+              <!-- Formulario de anticipo (oculto inicialmente) -->
+              <div id="anticipo-form" style="display:none;" class="border rounded p-3 bg-light">
+                <input type="hidden" id="anticipo_idx_editing" value="">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Monto <span class="text-danger">*</span></label>
+                    <input type="text" id="anticipo_monto_input" class="form-control" placeholder="$0"
+                      autocomplete="off">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Método de Pago <span class="text-danger">*</span></label>
+                    <select id="anticipo_metodo_input" class="form-select">
+                      <option value="">Seleccionar...</option>
+                      <option value="efectivo">Efectivo</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="transferencia">Transferencia</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Número Factura Siigo <span id="siigo-required" class="text-danger"
+                        style="display:none;">*</span></label>
+                    <input type="text" id="numero_factura_siigo_input" class="form-control"
+                      placeholder="Ingrese número de factura manualmente">
+                  </div>
+                </div>
+                <div class="mt-3 d-flex justify-content-end gap-2">
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-cancelar-anticipo">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                  </button>
+                  <button type="button" class="btn btn-sm btn-warning" id="btn-guardar-anticipo">
+                    <i class="bi bi-check-circle"></i> Agregar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Input hidden para enviar anticipos como JSON -->
+              <input type="hidden" name="anticipos_json" id="anticipos-json">
+            </div>
+            <!-- Responsable -->
+            <div class="mb-4">
+              <label class="form-label">Responsable</label>
+              <input type="text" name="responsable" class="form-control" placeholder="Nombre del responsable" required
+                value="{{ orden.responsable_nombre or '' }}">
+            </div>
+            <div class="d-flex justify-content-end gap-3">
+              <button type="button" onclick="window.history.back()" class="btn btn-secondary px-4 py-2 fw-bold">
+                <i class="bi bi-arrow-left"></i> Volver
+              </button>
+              <button type="submit" class="btn btn-primary px-4 py-2 fw-bold">
+                <i class="bi bi-save"></i> Guardar Cambios
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para agregar/editar artículo -->
+<div class="modal fade" id="modalArticulo" tabindex="-1" aria-labelledby="modalArticuloLabel" aria-hidden="true"
+  data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="form-articulo">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalArticuloLabel"><i class="bi bi-box-seam"></i> Agregar/Editar Artículo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="articulo_idx" id="articulo_idx">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Artículo</label>
+              <select name="tipo" id="articulo-tipo" class="form-select">
+                <option value="">Seleccionar...</option>
+                <option value="reloj">Reloj</option>
+                <option value="bateria">Batería</option>
+                <option value="ae">Artículo Electrónico</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Marca</label>
+              <input type="text" name="marca" class="form-control" placeholder="Marca" value="{{ orden.marca or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Referencia</label>
+              <input type="text" name="referencia" class="form-control" placeholder="Referencia"
+                value="{{ orden.referencia or '' }}">
+            </div>
+
+            <!-- Checklist detallado de características por tipo de artículo -->
+            <div id="check_list_reloj" style="display:none;">
+              <label class="form-label">Características del Reloj</label>
+              <div class="container-fluid">
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 justify-content-center">
+                  <!-- Caja -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Caja</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_rayada"
+                            value="Caja rayada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_rayada">Caja rayada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_quebrada"
+                            value="Caja quebrada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_quebrada">Caja quebrada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_manchada"
+                            value="Caja manchada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_manchada">Caja manchada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_porosa"
+                            value="Caja porosa" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_porosa">Caja porosa</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_sintornillo"
+                            value="Caja sin tornillo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_sintornillo">Caja sin
+                            tornillo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_decolorada"
+                            value="Caja decolorada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_decolorada">Caja
+                            decolorada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Cristal -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Cristal</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_rayado"
+                            value="Cristal rayado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_rayado">Cristal
+                            rayado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_quebrado"
+                            value="Cristal quebrado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_quebrado">Cristal
+                            quebrado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_despicado"
+                            value="Cristal despicado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_despicado">Cristal
+                            despicado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_manchado"
+                            value="Cristal manchado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_manchado">Cristal
+                            manchado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_humedad"
+                            value="Cristal con humedad" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_humedad">Cristal con
+                            humedad</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Esfera -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Esfera</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_rayada"
+                            value="Esfera rayada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_rayada">Esfera rayada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_quebrada"
+                            value="Esfera quebrada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_quebrada">Esfera
+                            quebrada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_manchada"
+                            value="Esfera manchada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_manchada">Esfera
+                            manchada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_decolorada"
+                            value="Esfera decolorada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_decolorada">Esfera
+                            decolorada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Manecillas -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Manecillas</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_dobles"
+                            value="Manecillas dobles" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_dobles">Manecillas
+                            dobles</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_rotas"
+                            value="Manecillas rotas" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_rotas">Manecillas
+                            rotas</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_faltantes"
+                            value="Manecillas faltantes" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_faltantes">Manecillas
+                            faltantes</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_decoloradas"
+                            value="Manecillas decoloradas" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_decoloradas">Manecillas
+                            decoloradas</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Movimiento -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Movimiento</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_automatico"
+                            value="Movimiento automático" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1"
+                            for="ch_movimiento_automatico">Automático</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_cuarto"
+                            value="Movimiento de cuarzo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_movimiento_cuarto">De cuarzo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_cronografo"
+                            value="Movimiento cronógrafo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1"
+                            for="ch_movimiento_cronografo">Cronógrafo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_danado"
+                            value="Movimiento dañado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_movimiento_danado">Movimiento
+                            dañado</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Correa/Pulsera -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Correa/Pulsera</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_cuero"
+                            value="Correa de cuero" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_cuero">Cuero</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_metal"
+                            value="Correa metálica" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_metal">Metálica</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_silicona"
+                            value="Correa de silicona" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_silicona">Silicona</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_danada"
+                            value="Correa dañada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_danada">Correa dañada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Campos adicionales para relojes -->
+                <div class="row mt-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Número de eslabones</label>
+                    <input type="number" name="eslabones_numero" id="eslabones_numero" class="form-control" min="1"
+                      placeholder="Ej: 5">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Reloj:</label>
+                    <div class="d-flex flex-wrap">
+                      <input class="btn-check" type="radio" name="tapa_tipo" id="tapa_original" value="Original"
+                        autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm m-1" for="tapa_original">Original</label>
+
+                      <input class="btn-check" type="radio" name="tapa_tipo" id="tapa_imitacion" value="Imitación"
+                        autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm m-1" for="tapa_imitacion">Imitación</label>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Garantía</label>
+                    <div class="d-flex flex-wrap">
+                      <input class="btn-check" type="radio" name="garantia" id="garantia_si" value="Con garantía"
+                        autocomplete="off">
+                      <label class="btn btn-outline-success btn-sm m-1" for="garantia_si">Con garantía</label>
+
+                      <input class="btn-check" type="radio" name="garantia" id="garantia_no" value="Sin garantía"
+                        autocomplete="off">
+                      <label class="btn btn-outline-danger btn-sm m-1" for="garantia_no">Sin garantía</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Checklist para baterías -->
+            <div id="check_list_bateria" style="display:none;">
+              <label class="form-label">Características de la Batería</label>
+              <div class="container-fluid">
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 justify-content-center">
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Voltaje</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_voltaje" id="bateria_voltaje"
+                          class="form-control form-control-sm" placeholder="Ej. 3.7V">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Amperaje</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_amperaje" id="bateria_amperaje"
+                          class="form-control form-control-sm" placeholder="Ej. 2000 mAh">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Cantidad de celdas</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_celdas" id="bateria_celdas"
+                          class="form-control form-control-sm" placeholder="Ej. 1, 2, 3">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Aplicación</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_industrial"
+                            value="industrial" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_industrial">Industrial</label>
+
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_biomedica"
+                            value="biomedica" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_biomedica">Biomédica</label>
+
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_ae"
+                            value="articulo electronico" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_ae">Artículo electrónico</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Placeholder para artículos electrónicos -->
+            <div id="check_list_ae" style="display:none;">
+              <label class="form-label">Características del Artículo Electrónico</label>
+              <div class="container-fluid">
+                <div class="row">
+                  <div class="col-md-12">
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle"></i> Especifique las características en la descripción del artículo.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Descripción <span class="text-danger">*</span></label>
+              <textarea name="descripcion" class="form-control" rows="2"
+                placeholder="Descripción del artículo">{{ orden.descripcion or '' }}</textarea>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Productos/Servicios</label>
+              <div class="border rounded p-3 bg-light">
+                <!-- Formulario para agregar productos -->
+                <!-- Formulario para agregar productos -->
+                <div class="row g-2 mb-3">
+                  <div class="col-md-2">
+                    <input type="text" class="form-control form-control-sm" id="producto-sku"
+                      placeholder="Buscar producto..." autocomplete="off">
+                    <div id="productos-sugerencias" class="position-absolute bg-white border rounded shadow-sm"
+                      style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto; width: calc(100% - 30px);">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" id="producto-nombre-custom"
+                      placeholder="Nombre personalizado (opcional)" autocomplete="off">
+                  </div>
+                  <div class="col-md-1">
+                    <input type="number" class="form-control form-control-sm" id="producto-cantidad" placeholder="Cant."
+                      min="1" value="1">
+                  </div>
+                  <div class="col-md-2">
+                    <input type="number" class="form-control form-control-sm" id="producto-descuento"
+                      placeholder="Desc. %" min="0" max="100" value="0" step="0.01">
+                  </div>
+                  <div class="col-md-2">
+                    <input type="text" class="form-control form-control-sm" id="producto-precio" placeholder="Precio $"
+                      inputmode="numeric">
+                  </div>
+                  <div class="col-md-2">
+                    <button type="button" class="btn btn-success btn-sm w-100" id="btn-agregar-al-carrito">
+                      <i class="bi bi-cart-plus"></i> Agregar
+                    </button>
+                  </div>
+                </div> <!-- Lista de productos agregados -->
+                <div id="productos-articulo-lista" class="mb-2">
+                  <!-- Aquí se mostrarán los productos agregados dinámicamente -->
+                  <div class="text-muted small">No hay productos agregados aún</div>
+                </div>
+                <div class="text-end">
+                  <strong>Subtotal: $<span id="productos-articulo-total">0</span></strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Valor Total del Artículo</label>
+              <input type="number" name="valor" id="valor-articulo" class="form-control" min="0" step="1"
+                placeholder="$" readonly>
+              <small class="form-text text-muted">Calculado automáticamente de los productos agregados</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Sitio de Reparación <span class="text-danger">*</span></label>
+              <select name="sitio_reparacion" id="articulo-sitio" class="form-select" required>
+                <option value="">Selecciona sitio de reparación...</option>
+                <!-- Las opciones se llenarán dinámicamente desde el backend o JS -->
+              </select>
+              <small class="form-text text-muted">Selecciona donde se reparará este artículo</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-articulo"
+            data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar artículo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% include 'snippets/modalNuevoCliente.html' %}
+
+<!-- Modal para editar nombre de producto -->
+<div class="modal fade" id="modalEditarNombreProducto" tabindex="-1" aria-labelledby="modalEditarNombreProductoLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalEditarNombreProductoLabel">
+          <i class="bi bi-pencil-square"></i> Editar Nombre del Producto
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <label for="input-nombre-producto-edit" class="form-label">Nombre del Producto</label>
+        <input type="text" class="form-control" id="input-nombre-producto-edit" placeholder="Ingrese el nombre..."
+          style="text-transform: uppercase;">
+        <small class="text-muted">El texto se convertirá automáticamente a MAYÚSCULAS</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar-nombre-producto">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Cliente OT -->
+<div class="modal fade" id="modalEditarClienteOT" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">Editar Cliente - Orden de Trabajo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditarCliente">
+          <input type="hidden" name="id" id="editar-cliente-id">
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" name="nombre" id="editar-cliente-nombre" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tipo</label>
+            <select class="form-select" name="tipo" id="editar-cliente-tipo">
+              <option value="natural">Persona</option>
+              <option value="empresa">Empresa</option>
+            </select>
+          </div>
+          <div class="mb-3" id="editar-campo-identificacion">
+            <label class="form-label" id="editar-label-identificacion">Identificación</label>
+            <input class="form-control" name="identificacion" id="editar-cliente-identificacion">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo</label>
+            <input class="form-control" name="correo" id="editar-cliente-correo">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Teléfono</label>
+            <input class="form-control" name="telefono" id="editar-cliente-telefono">
+          </div>
+        </form>
+        <div id="editar-cliente-error" class="text-danger" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-guardar-cliente-edicion" class="btn btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Scripts del sistema de modulos -->
+<script src="{{ url_for('static', filename='js/shared/event-bus.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/modules/clients/clients-core.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/orden_trabajo_carrito.js') }}?v=20251120k"></script>
+
+<!-- Datos de la orden existente para pre-cargar -->
+<script>
+  window.ordenExistente = {
+    articulos_json: {{ articulos_unificados | tojson | safe }},
+    caracteristicas: {{ orden.caracteristicas_articulo | tojson | safe }},
+    anticipos: {{ anticipos_serialized | tojson | safe }},
+    cliente: {
+      id: {{ orden.client.id }},
+      nombre: {{ orden.client.nombre | tojson | safe }},
+      cedula: {{ (orden.client.cc or orden.client.nit or '') | tojson | safe }},
+      telefono: {{ (orden.client.telefono or '') | tojson | safe }},
+      correo: {{ (orden.client.correo or '') | tojson | safe }}
+    }
+  };
+  window.userRol = {{ current_user.rol | tojson | safe }};
+  // Inicializar datos del cliente usando el módulo ClientsModule
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 Inicializando datos del cliente para edición');
+    
+    // Verificar que ClientsModule esté disponible
+    if (typeof window.ClientsModule === 'undefined') {
+      console.error('❌ ClientsModule no está cargado');
+      return;
+    }
+    
+    // Verificar que tengamos datos del cliente
+    if (!window.ordenExistente || !window.ordenExistente.cliente) {
+      console.warn('⚠️ No hay datos de cliente en ordenExistente');
+      return;
+    }
+    
+    const cliente = window.ordenExistente.cliente;
+    console.log('✅ Cliente de la orden:', cliente);
+    
+    // Usar el módulo ClientsModule para seleccionar el cliente
+    // Esto manejará toda la lógica de visualización de manera consistente
+    try {
+      window.ClientsModule.selectClient(cliente);
+      console.log('✅ Cliente cargado correctamente mediante ClientsModule');
+      
+      // Configurar botón de editar cliente usando EventBus
+      const btnEditarCliente = document.getElementById('btn-editar-cliente');
+      if (btnEditarCliente) {
+        btnEditarCliente.addEventListener('click', function(e) {
+          e.preventDefault();
+          window.location.href = '/clients/editar/' + cliente.id;
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar cliente:', error);
+      
+      // Fallback: mostrar datos manualmente si el módulo falla
+      const buscarClienteInput = document.getElementById('buscar-cliente');
+      if (buscarClienteInput) {
+        buscarClienteInput.value = cliente.nombre;
+      }
+      
+      const clientIdInput = document.getElementById('client-id');
+      if (clientIdInput) {
+        clientIdInput.value = cliente.id;
+      }
+    }
+  });
+</script>
+
+<script>
+  (function () {
+    function inicializarAnticipos() {
+      console.log('🚀 Inicializando sistema de anticipos');
+
+      // ==================== SISTEMA DE ANTICIPOS ====================
+      let anticipos = [];
+
+      // Declarar elementos del DOM primero
+      console.log('📍 Buscando elementos del DOM...');
+      const btnAgregarAnticipo = document.getElementById('btn-agregar-anticipo');
+
+      if (!btnAgregarAnticipo) {
+        console.error('❌ CRÍTICO: Botón agregar anticipo NO encontrado');
+        return;
+      }
+
+      const btnGuardarAnticipo = document.getElementById('btn-guardar-anticipo');
+      const btnCancelarAnticipo = document.getElementById('btn-cancelar-anticipo');
+      const anticipoForm = document.getElementById('anticipo-form');
+      const anticiposContainer = document.getElementById('anticipos-container');
+      const anticiposLista = document.getElementById('anticipos-lista');
+      const anticiposTotal = document.getElementById('anticipos-total');
+      const anticiposJsonInput = document.getElementById('anticipos-json');
+      const articulosTotal = document.getElementById('articulos-total');
+      const numeroFacturaInput = document.getElementById('numero_factura_siigo');
+
+      console.log('🔍 Estado de elementos:', {
+        btnAgregarAnticipo: btnAgregarAnticipo ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        btnGuardarAnticipo: btnGuardarAnticipo ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        btnCancelarAnticipo: btnCancelarAnticipo ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        anticipoForm: anticipoForm ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        anticiposContainer: anticiposContainer ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        anticiposLista: anticiposLista ? 'ENCONTRADO' : 'NO ENCONTRADO'
+      });
+
+      if (!btnAgregarAnticipo) {
+        console.error('❌ CRÍTICO: Botón agregar anticipo NO encontrado');
+        return;
+      }
+
+      if (!anticipoForm) {
+        console.error('❌ CRÍTICO: Formulario de anticipo NO encontrado');
+        return;
+      }
+
+      // ==================== CONFIGURAR LISTENERS PRIMERO ====================
+      // Es CRÍTICO configurar los listeners ANTES de cargar datos existentes
+      // porque si hay un error al cargar datos, los listeners no se configurarían
+      console.log('📌 Configurando listeners de anticipos...');
+
+      // Listener para abrir el formulario de anticipo
+      btnAgregarAnticipo.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Mostrar el formulario
+        anticipoForm.style.display = 'block';
+        this.style.display = 'none';
+
+        // Limpiar el formulario
+        document.getElementById('anticipo_monto_input').value = '';
+        document.getElementById('anticipo_metodo_input').value = '';
+        if (numeroFacturaInput) numeroFacturaInput.value = '';
+
+        editandoAnticipoIdx = null;
+      });
+
+      console.log('✅ Listeners configurados');
+
+      // Asegurar que el campo numero_factura_siigo no esté marcado como required inicialmente
+      if (numeroFacturaInput) {
+        numeroFacturaInput.required = false;
+      }
+
+      // ==================== CARGAR DATOS EXISTENTES ====================
+      if (window.ordenExistente) {
+        try {
+          // Cargar artículos desde articulos_json unificado
+          if (window.ordenExistente.articulos_json && window.ordenExistente.articulos_json.length > 0) {
+            if (typeof window.cargarArticulosExistentes === 'function') {
+              console.log('📦 Cargando artículos desde articulos_json unificado');
+              window.cargarArticulosExistentes(window.ordenExistente.articulos_json);
+            } else {
+              console.warn('⚠️ window.cargarArticulosExistentes no está definida');
+            }
+          } else {
+            console.log('ℹ️ No hay artículos para cargar');
+          }
+        } catch (e) {
+          console.error('❌ Error cargando artículos existentes:', e);
+        }
+
+        // Pre-marcar características
+        if (window.ordenExistente.caracteristicas) {
+          // TODO: Pre-marcar checkboxes basados en características
+        }
+
+        // Cargar anticipos existentes
+        try {
+          if (window.ordenExistente.anticipos && window.ordenExistente.anticipos.length > 0) {
+            anticipos = window.ordenExistente.anticipos.map(ant => ({
+              id: ant.id,
+              monto: ant.monto,
+              metodo: ant.metodo,
+              numero_factura_siigo: ant.numero_factura_siigo
+            }));
+            renderizarAnticipos();
+          }
+        } catch (e) {
+          console.error('❌ Error cargando anticipos existentes:', e);
+        }
+      }
+
+      // ==================== CONFIGURAR MÁS LISTENERS ====================
+
+      // Cancelar agregar anticipo
+      if (btnCancelarAnticipo) {
+        btnCancelarAnticipo.addEventListener('click', function () {
+          console.log('🔔 Click en cancelar anticipo');
+          if (typeof limpiarFormularioAnticipo === 'function') {
+            limpiarFormularioAnticipo();
+          }
+          anticipoForm.style.display = 'none';
+          btnAgregarAnticipo.style.display = 'inline-block';
+
+          // Restaurar botón a estado original
+          if (btnGuardarAnticipo) {
+            btnGuardarAnticipo.innerHTML = '<i class="bi bi-check-circle"></i> Agregar';
+            btnGuardarAnticipo.classList.remove('btn-primary');
+            btnGuardarAnticipo.classList.add('btn-warning');
+          }
+        });
+      }
+
+      // Guardar anticipo (agregar o editar)
+      if (btnGuardarAnticipo) {
+        btnGuardarAnticipo.addEventListener('click', function () {
+          const montoInput = document.getElementById('anticipo_monto_input');
+          const monto = parseFloat(montoInput.value.replace(/\./g, '')) || 0;
+          const metodo = document.getElementById('anticipo_metodo_input').value;
+          const numeroFactura = document.getElementById('numero_factura_siigo_input').value.trim();
+          const editingIdx = document.getElementById('anticipo_idx_editing').value;
+
+          // Validaciones
+          if (monto <= 0) {
+            alert('Por favor ingrese un monto válido');
+            return;
+          }
+
+          if (!metodo) {
+            alert('Por favor seleccione un método de pago');
+            return;
+          }
+
+          if ((metodo === 'tarjeta' || metodo === 'transferencia') && !numeroFactura) {
+            alert('El número de factura Siigo es obligatorio para pagos con tarjeta o transferencia');
+            return;
+          }
+
+          // Crear objeto anticipo
+          const anticipo = {
+            monto: monto,
+            metodo: metodo,
+            numero_factura_siigo: numeroFactura
+          };
+
+          // Verificar si estamos editando o agregando
+          if (editingIdx !== '' && !isNaN(editingIdx)) {
+            // EDITAR anticipo existente
+            anticipos[parseInt(editingIdx)] = anticipo;
+          } else {
+            // AGREGAR nuevo anticipo
+            anticipos.push(anticipo);
+          }
+
+          // Actualizar vista
+          renderizarAnticipos();
+
+          // Limpiar y ocultar formulario
+          limpiarFormularioAnticipo();
+          anticipoForm.style.display = 'none';
+          btnAgregarAnticipo.style.display = 'inline-block';
+
+          // Restaurar botón a estado original
+          btnGuardarAnticipo.innerHTML = '<i class="bi bi-check-circle"></i> Agregar';
+          btnGuardarAnticipo.classList.remove('btn-primary');
+          btnGuardarAnticipo.classList.add('btn-warning');
+        });
+      }
+
+      // Validación dinámica para número de factura Siigo
+      const anticipoMetodoSelect = document.getElementById('anticipo_metodo_input');
+      if (anticipoMetodoSelect) {
+        anticipoMetodoSelect.addEventListener('change', function () {
+          const metodo = this.value;
+          const numeroFacturaInput = document.getElementById('numero_factura_siigo_input');
+          const siigoRequired = document.getElementById('siigo-required');
+
+          if (metodo === 'tarjeta' || metodo === 'transferencia') {
+            numeroFacturaInput.required = true;
+            numeroFacturaInput.placeholder = 'REQUERIDO: Ingrese número de factura Siigo';
+            numeroFacturaInput.classList.add('border-warning');
+            if (siigoRequired) siigoRequired.style.display = 'inline';
+          } else {
+            numeroFacturaInput.required = false;
+            numeroFacturaInput.placeholder = 'Opcional para efectivo';
+            numeroFacturaInput.classList.remove('border-warning');
+            if (siigoRequired) siigoRequired.style.display = 'none';
+          }
+        });
+      }
+
+      // Renderizar lista de anticipos
+      function renderizarAnticipos() {
+        if (!anticiposLista || !anticiposContainer || !anticiposTotal || !anticiposJsonInput) {
+          console.error('❌ Elementos de anticipos no encontrados');
+          return;
+        }
+
+        anticiposLista.innerHTML = '';
+        let total = 0;
+
+        if (anticipos.length === 0) {
+          anticiposContainer.style.display = 'none';
+        } else {
+          anticiposContainer.style.display = 'block';
+
+          anticipos.forEach((ant, idx) => {
+            total += ant.monto;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+          <td><span class="badge bg-secondary">${idx + 1}</span></td>
+          <td class="fw-bold text-success">$${Math.round(ant.monto).toLocaleString('es-CO')}</td>
+          <td><span class="badge bg-info">${ant.metodo.toUpperCase()}</span></td>
+          <td>${ant.numero_factura_siigo || '-'}</td>
+          <td class="text-center">
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-outline-primary" 
+                      onclick="editarAnticipo(${idx})" 
+                      title="Editar anticipo">
+                <i class="bi bi-pencil"></i>
+              </button>
+              ${(window.userRol === 'admin' || window.userRol === 'supervisor') ? `
+              <button type="button" class="btn btn-outline-danger" 
+                      onclick="eliminarAnticipo(${idx})" 
+                      title="Eliminar anticipo">
+                <i class="bi bi-trash"></i>
+              </button>` : ''}
+            </div>
+          </td>
+        `;
+            anticiposLista.appendChild(row);
+          });
+        }
+
+        // Actualizar total de anticipos
+        anticiposTotal.textContent = Math.round(total).toLocaleString('es-CO');
+
+        // Actualizar campo hidden
+        anticiposJsonInput.value = JSON.stringify(anticipos);
+
+        // Actualizar total final (artículos - anticipos)
+        actualizarTotalFinal();
+      }
+
+      // Editar anticipo
+      window.editarAnticipo = function (idx) {
+        const anticipo = anticipos[idx];
+
+        // Llenar formulario con datos del anticipo
+        const montoInput = document.getElementById('anticipo_monto_input');
+        const metodoSelect = document.getElementById('anticipo_metodo_input');
+        const numeroFacturaInput = document.getElementById('numero_factura_siigo_input');
+
+        if (montoInput) montoInput.value = Math.round(anticipo.monto).toLocaleString('es-CO');
+        if (metodoSelect) metodoSelect.value = anticipo.metodo || '';
+        if (numeroFacturaInput) numeroFacturaInput.value = anticipo.numero_factura_siigo || '';
+
+        // Guardar índice que estamos editando
+        document.getElementById('anticipo_idx_editing').value = idx;
+
+        // Cambiar texto del botón
+        const btnGuardar = document.getElementById('btn-guardar-anticipo');
+        if (btnGuardar) {
+          btnGuardar.innerHTML = '<i class="bi bi-check-circle"></i> Actualizar';
+          btnGuardar.classList.remove('btn-warning');
+          btnGuardar.classList.add('btn-primary');
+        }
+
+        // Mostrar formulario
+        anticipoForm.style.display = 'block';
+        btnAgregarAnticipo.style.display = 'none';
+
+        // Trigger validación de Siigo
+        if (metodoSelect) {
+          metodoSelect.dispatchEvent(new Event('change'));
+        }
+      };
+
+      // Eliminar anticipo
+      window.eliminarAnticipo = function (idx) {
+        if (confirm('¿Eliminar este anticipo?')) {
+          anticipos.splice(idx, 1);
+          renderizarAnticipos();
+        }
+      };
+
+      // Limpiar formulario de anticipo
+      function limpiarFormularioAnticipo() {
+        document.getElementById('anticipo_monto_input').value = '';
+        document.getElementById('anticipo_metodo_input').value = '';
+        document.getElementById('anticipo_idx_editing').value = '';
+        const numeroFacturaInput = document.getElementById('numero_factura_siigo_input');
+        numeroFacturaInput.value = '';
+        numeroFacturaInput.required = false;
+        numeroFacturaInput.placeholder = 'Ingrese número de factura manualmente';
+        numeroFacturaInput.classList.remove('border-warning');
+        document.getElementById('siigo-required').style.display = 'none';
+      }
+
+      // Formato de miles con puntos para el input de monto
+      const montoInput = document.getElementById('anticipo_monto_input');
+      if (montoInput) {
+        montoInput.addEventListener('input', function (e) {
+          let value = e.target.value.replace(/\./g, '');
+          value = value.replace(/\D/g, '');
+          if (value) {
+            e.target.value = parseInt(value).toLocaleString('es-CO');
+          }
+        });
+      }
+
+      // Actualizar total final (artículos - anticipos)
+      function actualizarTotalFinal() {
+        // Obtener valores quitando puntos y comas
+        const totalArticulosText = articulosTotal ? articulosTotal.textContent.replace(/\./g, '').replace(/,/g, '') : '0';
+        const totalAnticiposText = anticiposTotal ? anticiposTotal.textContent.replace(/\./g, '').replace(/,/g, '') : '0';
+
+        const totalArticulos = parseFloat(totalArticulosText) || 0;
+        const totalAnticipos = parseFloat(totalAnticiposText) || 0;
+        const totalFinal = totalArticulos - totalAnticipos;
+
+        // Actualizar displays
+        const totalFinalSpan = document.getElementById('total-final');
+        const totalArticulosDisplay = document.getElementById('total-articulos-display');
+        const totalAnticiposDisplay = document.getElementById('total-anticipos-display');
+        const totalFinalContainer = document.getElementById('total-final-container');
+
+        if (totalArticulosDisplay) {
+          totalArticulosDisplay.textContent = Math.round(totalArticulos).toLocaleString('es-CO');
+        }
+        if (totalAnticiposDisplay) {
+          totalAnticiposDisplay.textContent = Math.round(totalAnticipos).toLocaleString('es-CO');
+        }
+        if (totalFinalSpan) {
+          totalFinalSpan.textContent = Math.round(totalFinal).toLocaleString('es-CO');
+        }
+
+        // Mostrar/ocultar contenedor del total final
+        if (totalFinalContainer) {
+          if (totalArticulos > 0 || totalAnticipos > 0) {
+            totalFinalContainer.style.display = 'block';
+          } else {
+            totalFinalContainer.style.display = 'none';
+          }
+        }
+      }
+
+      // Exponer función globalmente para que la use el carrito
+      window.actualizarTotalFinal = actualizarTotalFinal;
+
+      // ==================== FIN SISTEMA DE ANTICIPOS ====================
+
+      // --- Funcionalidad del modal de editar cliente ---
+
+      // Función para obtener el token CSRF
+      function getCsrfToken() {
+        // Buscar en inputs hidden del formulario
+        const csrfInput = document.querySelector('input[name="csrf_token"]');
+        if (csrfInput) {
+          return csrfInput.value;
+        }
+        // Buscar en meta tags
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) {
+          return csrfMeta.getAttribute('content');
+        }
+        return null;
+      }
+
+      // Usar event delegation para el botón editar cliente
+      document.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'btn-editar-cliente') {
+          e.preventDefault();
+          const id = document.getElementById('client-id').value;
+          if (!id) {
+            alert('Seleccione primero un cliente para editar.');
+            return;
+          }
+
+          // Mostrar loading en el botón
+          e.target.innerHTML = '<i class="bi bi-hourglass-split"></i> Cargando...';
+          e.target.disabled = true;
+
+          const csrfToken = getCsrfToken();
+          const headers = {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          };
+          if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+          }
+
+          fetch(`/clients/api/cliente/${id}`, {
+            headers: headers,
+            credentials: 'same-origin'
+          })
+            .then(res => res.json())
+            .then(data => {
+
+              if (!data || !data.id) {
+                throw new Error('Datos del cliente no válidos');
+              }
+
+              const client = data;
+
+              // Llenar el formulario
+              document.getElementById('editar-cliente-id').value = client.id;
+              document.getElementById('editar-cliente-nombre').value = client.nombre || '';
+              document.getElementById('editar-cliente-tipo').value = client.cc ? 'natural' : 'empresa';
+              document.getElementById('editar-cliente-identificacion').value = client.cc || client.nit || '';
+              document.getElementById('editar-cliente-correo').value = client.correo || '';
+              document.getElementById('editar-cliente-telefono').value = client.telefono || '';
+
+              // Actualizar label según el tipo
+              const tipoSelect = document.getElementById('editar-cliente-tipo');
+              const lbl = document.getElementById('editar-label-identificacion');
+              if (tipoSelect.value === 'empresa') {
+                lbl.textContent = 'NIT';
+              } else {
+                lbl.textContent = 'Número de identificación';
+              }
+
+              // Mostrar modal
+              const modal = new bootstrap.Modal(document.getElementById('modalEditarClienteOT'));
+              modal.show();
+
+            })
+            .catch(error => {
+              console.error('Error al cargar datos del cliente:', error);
+              alert('Error al cargar datos del cliente: ' + error.message);
+            })
+            .finally(() => {
+              // Restaurar botón
+              e.target.innerHTML = '<i class="bi bi-pencil"></i> Editar cliente';
+              e.target.disabled = false;
+            });
+        }
+      });
+
+      // Configurar el tipo de identificación dinámicamente
+      document.getElementById('editar-cliente-tipo').addEventListener('change', function () {
+        const lbl = document.getElementById('editar-label-identificacion');
+        if (this.value === 'empresa') {
+          lbl.textContent = 'NIT';
+        } else {
+          lbl.textContent = 'Número de identificación';
+        }
+      });
+
+      // Guardar cambios del cliente
+      document.getElementById('btn-guardar-cliente-edicion').addEventListener('click', async function () {
+        const id = document.getElementById('editar-cliente-id').value;
+        const payload = {
+          nombre: document.getElementById('editar-cliente-nombre').value,
+          correo: document.getElementById('editar-cliente-correo').value,
+          telefono: document.getElementById('editar-cliente-telefono').value,
+          tipo: document.getElementById('editar-cliente-tipo').value,
+          cc: '',
+          nit: ''
+        };
+        const ident = document.getElementById('editar-cliente-identificacion').value || '';
+        if (payload.tipo === 'natural') payload.cc = ident; else payload.nit = ident;
+
+        const errDiv = document.getElementById('editar-cliente-error');
+        errDiv.style.display = 'none';
+
+        // Mostrar loading
+        this.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+        this.disabled = true;
+
+        try {
+          const csrfToken = getCsrfToken();
+          const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          };
+          if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+          }
+
+          const res = await fetch(`/clients/api/cliente/${id}`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload),
+            credentials: 'same-origin'
+          });
+
+          let data;
+          try {
+            data = await res.json();
+          } catch (jsonError) {
+            const textResponse = await res.text();
+            throw new Error('Respuesta no válida del servidor');
+          }
+
+          if (!res.ok || !data.success) {
+            errDiv.textContent = (data && data.error) ? data.error : 'Error al actualizar cliente';
+            errDiv.style.display = '';
+            return;
+          }
+
+          // Actualizar la UI con los nuevos valores
+          const client = data.cliente || data;
+
+          // Actualizar elementos principales (siempre deberían existir)
+          const buscarCliente = document.getElementById('buscar-cliente');
+          const clienteId = document.getElementById('client-id');
+          const nombreDisplay = document.getElementById('cliente-nombre-display');
+          const documentoSpan = document.getElementById('cliente-documento');
+
+          if (buscarCliente) buscarCliente.value = client.nombre || '';
+          if (clienteId) clienteId.value = client.id || id;
+          if (nombreDisplay) nombreDisplay.textContent = client.nombre || '-';
+          if (documentoSpan) documentoSpan.textContent = client.cedula || '-';
+
+          // Actualizar correo
+          const correoSpan = document.getElementById('cliente-correo');
+          const correoContainer = document.getElementById('cliente-correo-container');
+          if (correoSpan && correoContainer) {
+            if (client.correo) {
+              correoSpan.textContent = client.correo;
+              correoContainer.style.display = 'block';
+            } else {
+              correoContainer.style.display = 'none';
+            }
+          }
+
+          // Actualizar teléfono
+          const telefonoSpan = document.getElementById('cliente-telefono');
+          const telefonoContainer = document.getElementById('cliente-telefono-container');
+          if (telefonoSpan && telefonoContainer) {
+            if (client.telefono) {
+              telefonoSpan.textContent = client.telefono;
+              telefonoContainer.style.display = 'block';
+            } else {
+              telefonoContainer.style.display = 'none';
+            }
+          }
+
+          // Actualizar campos ocultos
+          const cedulaInput = document.getElementById('cliente-cedula');
+          const telefonoHidden = document.getElementById('cliente-telefono-hidden');
+          if (cedulaInput) cedulaInput.value = client.cedula || '';
+          if (telefonoHidden) telefonoHidden.value = client.telefono || '';
+
+          // Cerrar modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarClienteOT'));
+          if (modal) modal.hide();
+
+          // Mostrar mensaje de éxito
+          alert('Cliente actualizado correctamente');
+
+        } catch (e) {
+          errDiv.textContent = `Error de red al actualizar cliente: ${e.message}`;
+          errDiv.style.display = '';
+        } finally {
+          // Restaurar botón
+          this.innerHTML = 'Guardar';
+          this.disabled = false;
+        }
+      });
+
+      // Funcionalidad del checklist de características por tipo de artículo
+      const articuloTipoSelect = document.getElementById('articulo-tipo');
+      const clReloj = document.getElementById('check_list_reloj');
+      const clBat = document.getElementById('check_list_bateria');
+      const clAE = document.getElementById('check_list_ae');
+
+      function hideAllChecklists() {
+        if (clReloj) clReloj.style.display = 'none';
+        if (clBat) clBat.style.display = 'none';
+        if (clAE) clAE.style.display = 'none';
+      }
+
+      function showChecklistForTipo() {
+        hideAllChecklists();
+        if (!articuloTipoSelect) return;
+        const tipo = articuloTipoSelect.value;
+        if (tipo === 'reloj') {
+          if (clReloj) clReloj.style.display = 'block';
+        }
+        else if (tipo === 'bateria') {
+          if (clBat) clBat.style.display = 'block';
+        }
+        else if (tipo === 'ae') {
+          if (clAE) clAE.style.display = 'block';
+        }
+      }
+
+      if (articuloTipoSelect) {
+        articuloTipoSelect.addEventListener('change', showChecklistForTipo);
+        // Ejecutar al cargar por si el formulario se restaura
+        showChecklistForTipo();
+      }
+
+      // Código duplicado eliminado - la validación ya existe arriba
+
+      // Event listener del formulario principal
+      const formCrearOTElement = document.getElementById('form-crear-ot');
+      if (formCrearOTElement) {
+        console.log('✅ Formulario encontrado, configurando listener');
+        formCrearOTElement.addEventListener('submit', function (e) {
+          console.log('🔔 Submit event detectado');
+
+          // Verificar campos requeridos antes del envío
+          const tecnicoId = document.getElementById('tecnico_id');
+          const responsable = document.querySelector('input[name="responsable"]');
+
+          const submitBtn = this.querySelector('button[type="submit"]');
+
+          if (!tecnicoId || !tecnicoId.value) {
+            alert('Por favor seleccione un sitio de reparación');
+            e.preventDefault();
+            return false;
+          }
+
+          if (!responsable || !responsable.value.trim()) {
+            alert('Por favor ingrese el nombre del responsable');
+            e.preventDefault();
+            return false;
+          }
+
+          // Validar anticipos que tengan factura Siigo requerida
+          const numeroFacturaInput = document.getElementById('numero_factura_siigo');
+          if (numeroFacturaInput && numeroFacturaInput.required && !numeroFacturaInput.value.trim()) {
+            alert('Por favor complete el número de factura Siigo requerido');
+            e.preventDefault();
+            return false;
+          }
+
+          // Bloquear botón para prevenir doble envío
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+          }
+
+          // Poblar campos ocultos requeridos por WTForms con datos de la orden existente
+          const categoriaHidden = document.getElementById('categoria-hidden');
+          const referenciaHidden = document.getElementById('referencia-hidden');
+          const descripcionHidden = document.getElementById('descripcion-hidden');
+
+          if (categoriaHidden && !categoriaHidden.value) {
+            categoriaHidden.value = '{{ orden.category_id or 1 }}';
+          }
+
+          if (referenciaHidden && !referenciaHidden.value) {
+            referenciaHidden.value = '{{ orden.referencia or "REF-EDIT" }}';
+          }
+
+          if (descripcionHidden && !descripcionHidden.value) {
+            descripcionHidden.value = '{{ orden.descripcion or "Orden editada con sistema de artículos" }}';
+          }
+
+          // El formulario se envía normalmente
+          return true;
+        });
+      } else {
+        console.log('❌ Formulario NO encontrado');
+      }
+
+      console.log('✅ Sistema de anticipos inicializado correctamente');
+
+    } // Cierre de la función inicializarAnticipos
+
+    // Ejecutar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', inicializarAnticipos);
+    } else {
+      // DOM ya está listo, ejecutar inmediatamente
+      inicializarAnticipos();
+    }
+  })();
+</script>
+
+  <!-- Modal Repuestos Internos (disponible para todos los usuarios) -->
+  {% if True %}
+  <div class="modal fade" id="modalRepuestosInternos" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-secondary text-white">
+          <h5 class="modal-title"><i class="bi bi-wrench"></i> Repuestos Implementados</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Listado</h6>
+            <button class="btn btn-sm btn-primary" id="btn-add-repuesto-toggle">Agregar Repuesto</button>
+          </div>
+
+          <div id="repuesto-form" style="display:none;" class="border rounded p-3 mb-3">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                <input type="text" id="rep-nombre" class="form-control" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Cantidad</label>
+                <input type="number" id="rep-cantidad" class="form-control" value="1" min="1" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Costo Unit.</label>
+                <input type="number" id="rep-costo" class="form-control" step="0.01" value="0" />
+              </div>
+              <div class="col-md-2 d-flex align-items-end">
+                <button id="btn-save-repuesto" class="btn btn-success w-100">Guardar</button>
+              </div>
+            </div>
+            <div class="mt-2">
+              <label class="form-label">Notas privadas</label>
+              <textarea id="rep-notas" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+
+          <!-- Alerta de comparación de costos -->
+          <div id="alerta-costos-repuestos" class="alert alert-warning d-none mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> <strong>¡ATENCIÓN!</strong>
+            <span id="texto-alerta-costos"></span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Cant.</th>
+                  <th>Costo Unit.</th>
+                  <th>Total</th>
+                  <th>Registrado</th>
+                  <th class="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="repuestos-lista"></tbody>
+              <tfoot id="repuestos-total" class="table-light d-none">
+                <tr>
+                  <th colspan="3" class="text-end">Total Repuestos:</th>
+                  <th id="total-repuestos-valor">$0</th>
+                  <th colspan="2"></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+<!-- Script para Repuestos Implementados -->
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    console.log('Inicializando script de repuestos implementados...');
+    
+    const btnOpen = document.getElementById('btn-repuestos-internos');
+    const modalEl = document.getElementById('modalRepuestosInternos');
+    
+    console.log('btnOpen:', btnOpen);
+    console.log('modalEl:', modalEl);
+    
+    if (!btnOpen || !modalEl) {
+      console.log('Repuestos no disponible para este rol o modal no encontrado');
+      return;
+    }
+
+    const repuestosLista = document.getElementById('repuestos-lista');
+    const repForm = document.getElementById('repuesto-form');
+    const btnToggle = document.getElementById('btn-add-repuesto-toggle');
+    const btnSave = document.getElementById('btn-save-repuesto');
+
+    let bsModal;
+    try {
+      bsModal = new bootstrap.Modal(modalEl, {
+        backdrop: 'static',
+        keyboard: false
+      });
+      console.log('Modal de Bootstrap creado exitosamente');
+    } catch(err) {
+      console.error('Error creando modal de Bootstrap:', err);
+      return;
+    }
+
+    btnOpen.addEventListener('click', function(e){
+      e.preventDefault();
+      console.log('Botón clickeado - Abriendo modal de repuestos');
+      try {
+        bsModal.show();
+        fetchRepuestos();
+      } catch(err) {
+        console.error('Error al abrir modal:', err);
+        alert('Error al abrir el modal: ' + err.message);
+      }
+    });
+
+    if (btnToggle) {
+      btnToggle.addEventListener('click', function(){
+        repForm.style.display = repForm.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+
+    async function fetchRepuestos(){
+      const url = '{{ url_for("ordenes.listar_repuestos", orden_id=orden.id) }}';
+      console.log('Cargando repuestos desde:', url);
+      try{
+        const res = await fetch(url, {credentials: 'same-origin'});
+        if (!res.ok) {
+          console.error('Error HTTP:', res.status);
+          if (res.status === 500) {
+            // Probablemente la tabla no existe aún - mostrar mensaje amigable
+            repuestosLista.innerHTML = '<tr><td colspan="6" class="text-center text-warning">La función de repuestos aún no está disponible. Ejecuta las migraciones pendientes.</td></tr>';
+            return;
+          }
+          throw new Error('HTTP ' + res.status);
+        }
+        const data = await res.json();
+        console.log('Repuestos cargados:', data);
+        renderRepuestos(data.repuestos || []);
+      }catch(err){
+        console.error('Error cargando repuestos:', err);
+        repuestosLista.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: ' + err.message + '</td></tr>';
+      }
+    }
+
+    function renderRepuestos(items){
+      if (!repuestosLista) return;
+      repuestosLista.innerHTML = '';
+      if (items.length === 0) {
+        repuestosLista.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No hay repuestos registrados</td></tr>';
+        verificarCostoRepuestos(0);
+        return;
+      }
+      
+      let totalRepuestos = 0;
+      items.forEach(it => {
+        totalRepuestos += (it.costo_total || 0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${it.nombre || ''}</td>
+          <td>${it.cantidad}</td>
+          <td>$${(it.costo_unitario||0).toLocaleString('es-CO')}</td>
+          <td>$${(it.costo_total||0).toLocaleString('es-CO')}</td>
+          <td>${it.registrado_por||''}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-danger btn-delete-rep" data-id="${it.id}">Eliminar</button>
+          </td>
+        `;
+        repuestosLista.appendChild(tr);
+      });
+      
+      // Verificar costo de repuestos vs servicios
+      verificarCostoRepuestos(totalRepuestos);
+      
+      // attach delete handlers
+      document.querySelectorAll('.btn-delete-rep').forEach(b => b.addEventListener('click', async (e)=>{
+        const id = e.currentTarget.getAttribute('data-id');
+        if (!confirm('¿Eliminar repuesto seleccionado?')) return;
+        try{
+          const res = await fetch(`/ordenes/repuestos/${id}`, {method: 'DELETE', credentials:'same-origin'});
+          const json = await res.json();
+          if (json.ok) fetchRepuestos(); else alert('No se pudo eliminar');
+        }catch(err){ console.error(err); alert('Error al eliminar'); }
+      }));
+    }
+    
+    // Helpers COP
+    function parseCopNumber(str){ return parseInt(String(str).replace(/[^0-9]/g,'')||'0',10); }
+    function formatCOP(n){ return Number(n||0).toLocaleString('es-CO'); }
+
+    if (btnSave) {
+      btnSave.addEventListener('click', async function(e){
+        e.preventDefault();
+        const nombre = document.getElementById('rep-nombre').value.trim();
+        const cantidad = parseInt(document.getElementById('rep-cantidad').value || '1', 10);
+        const costo = parseFloat(document.getElementById('rep-costo').value || '0');
+        const notas = document.getElementById('rep-notas').value || '';
+        if (!nombre){ alert('Nombre es requerido'); return; }
+        const payload = { nombre: nombre, cantidad: cantidad, costo_unitario: costo, notas_privadas: notas };
+        console.log('Guardando repuesto:', payload);
+        try{
+          const url = '{{ url_for("ordenes.crear_repuesto", orden_id=orden.id) }}';
+          const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), credentials:'same-origin'});
+          const json = await res.json();
+          console.log('Respuesta del servidor:', json);
+          if (res.status === 503) {
+            alert('La función de repuestos aún no está disponible.\n\nEjecuta las migraciones pendientes:\nflask db upgrade');
+            return;
+          }
+          if (json.ok){
+            // limpiar form
+            document.getElementById('rep-nombre').value = '';
+            document.getElementById('rep-cantidad').value = '1';
+            document.getElementById('rep-costo').value = '0';
+            document.getElementById('rep-notas').value = '';
+            repForm.style.display = 'none';
+            fetchRepuestos();
+          } else {
+            alert(json.error || 'Error al guardar');
+          }
+        }catch(err){ console.error('Error al guardar repuesto:', err); alert('Error al guardar repuesto: ' + err.message); }
+      });
+    }
+    
+    // Función para verificar si el costo de repuestos supera el valor del servicio
+    function verificarCostoRepuestos(totalRepuestos) {
+      const alertaDiv = document.getElementById('alerta-costo-repuestos');
+      const valorServiciosSpan = document.getElementById('valor-servicios-total');
+      const diferenciaSpan = document.getElementById('diferencia-repuestos-servicio');
+      if (!alertaDiv || !valorServiciosSpan) return;
+      const totalServicio = parseCopNumber(valorServiciosSpan.textContent);
+      if (totalRepuestos > totalServicio) {
+        const diferencia = totalRepuestos - totalServicio;
+        diferenciaSpan.innerHTML = `<small>Diferencia: <strong class="text-danger">$${formatCOP(diferencia)}</strong> adicionales en repuestos</small>`;
+        alertaDiv.classList.remove('d-none');
+      } else {
+        alertaDiv.classList.add('d-none');
+      }
+    }
+
+  });
+</script>
+{% endblock %}

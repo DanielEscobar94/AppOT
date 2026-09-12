@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-4">Seleccionar sucursal activa</h2>
+
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label for="branch_id" class="form-label">Sucursal</label>
+      <select name="branch_id" id="branch_id" class="form-select" required>
+        {% for b in sucursales %}
+          <option value="{{ b.id }}">{{ b.nombre }} - {{ b.ciudad }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Continuar</button>
+  </form>
+</div>
+{% endblock %}

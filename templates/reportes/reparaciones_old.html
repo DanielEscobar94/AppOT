@@ -1,0 +1,855 @@
+{% extends 'base.html' %}
+{% block title %}Reporte de Reparaciones{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow rounded-4 border-0">
+    <div class="card-header bg-dark text-white fw-bold rounded-top-4">
+      <i class="bi bi-tools"></i> Reporte de Reparaciones
+    </div>
+    <div class="card-body">
+      
+      <!-- Formulario de Filtros -->
+      <form method="GET" class="row g-3 mb-4 p-3 bg-light rounded">
+        <div class="col-md-3">
+          <label for="sitio" class="form-label">Sitio de Reparacion</label>
+          <select name="sitio" id="sitio" class="form-select">
+            <option value="">Todos</option>
+            {% for sitio in sitios %}
+              <option value="{{ sitio.id }}" {% if filtros.sitio_id == sitio.id %}selected{% endif %}>
+                {{ sitio.username or sitio.email }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-2">
+          <label for="estado" class="form-label">Estado</label>
+          <select name="estado" id="estado" class="form-select">
+            <option value="">Todos los estados</option>
+            {% for valor, nombre in estados %}
+              <option value="{{ valor }}" {% if filtros.estado == valor %}selected{% endif %}>
+                {{ nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-2">
+          <label for="fecha_inicio" class="form-label">Fecha Inicial</label>
+          <input type="text" name="fecha_inicio" id="fecha_inicio" class="form-control datepicker" placeholder="dd/mm/yyyy"
+                 value="{{ filtros.fecha_inicio or '' }}">
+        </div>
+        
+        <div class="col-md-2">
+          <label for="fecha_fin" class="form-label">Fecha Final</label>
+          <input type="text" name="fecha_fin" id="fecha_fin" class="form-control datepicker" placeholder="dd/mm/yyyy"
+                 value="{{ filtros.fecha_fin or '' }}">
+        </div>
+        
+        <div class="col-md-3 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary me-2">
+            <i class="bi bi-search"></i> Filtrar
+          </button>
+          <a href="{{ url_for('reportes.reparaciones') }}" class="btn btn-danger">
+            <i class="bi bi-x-circle"></i> Limpiar
+          </a>
+        </div>
+      </form>
+
+      <!-- Resumen General - Diseño compacto con tarjetas verdes -->
+      <div class="row g-3 mb-4">
+        <!-- Total General -->
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm h-100 bg-success">
+            <div class="card-body text-center py-3 text-white">
+              <i class="bi bi-tools fs-4 mb-2"></i>
+              <h6 class="mb-1">Total General</h6>
+              <h4 class="mb-0 fw-bold">${{ "{:,.0f}".format(total_reparaciones) }}</h4>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Taller Relojeria -->
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm h-100 bg-success">
+            <div class="card-body text-center py-3 text-white">
+              <i class="bi bi-watch fs-4 mb-2"></i>
+              <h6 class="mb-1">Taller Relojeria</h6>
+              <h4 class="mb-1 fw-bold">${{ "{:,.0f}".format(total_relojeria) }}</h4>
+              <small class="opacity-75">{{ ordenes_relojeria|length }} órdenes</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Lab. Ensambles -->
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm h-100 bg-success">
+            <div class="card-body text-center py-3 text-white">
+              <i class="bi bi-cpu fs-4 mb-2"></i>
+              <h6 class="mb-1">Lab. Ensambles</h6>
+              <h4 class="mb-1 fw-bold">${{ "{:,.0f}".format(total_ensambles) }}</h4>
+              <small class="opacity-75">{{ ordenes_ensambles|length }} órdenes</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Total Finalizadas -->
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm h-100 bg-success">
+            <div class="card-body text-center py-3 text-white">
+              <i class="bi bi-check-circle fs-4 mb-2"></i>
+              <h6 class="mb-1">Finalizadas</h6>
+              <h4 class="mb-1 fw-bold">{{ count_finalizadas }}</h4>
+              <small class="opacity-75">de {{ ordenes|length }} órdenes</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjetas de Vendedores (Sitios) - Diseño compacto verde -->
+      {% if ordenes_por_vendedor %}
+      <div class="row g-3 mb-4">
+        {% for vendedor_nombre in vendedores_list %}
+        <div class="col-md-3 col-sm-6">
+          <div class="card border-0 shadow-sm h-100 bg-success">
+            <div class="card-body text-center py-3 text-white">
+              <i class="bi bi-person-badge fs-5 mb-2"></i>
+              <h6 class="mb-1 small">{{ vendedor_nombre }}</h6>
+              <h5 class="mb-1 fw-bold">${{ "{:,.0f}".format(totales_por_vendedor[vendedor_nombre]) }}</h5>
+              <small class="opacity-75">{{ ordenes_por_vendedor[vendedor_nombre]|length }} órdenes</small>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- TALLER DE RELOJERIA -->
+      {% if ordenes_relojeria %}
+      <div class="mb-5">
+        <h4 class="text-primary mb-3">
+          <i class="bi bi-watch"></i> Taller de Relojeria
+          <span class="badge bg-primary">{{ ordenes_relojeria|length }} ordenes</span>
+        </h4>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-primary">
+              <tr>
+                <th># Orden</th>
+                <th>Cliente</th>
+                <th>Sucursal</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Responsable</th>
+                <th>Tecnico</th>
+                <th>Valor Total</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for orden in ordenes_relojeria %}
+              <tr>
+                <td><strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></td>
+                <td>{{ orden.client.nombre if orden.client else '—' }}</td>
+                <td>{{ orden.branch.nombre if orden.branch else '—' }}</td>
+                <td>{{ orden.fecha_creacion|local_date if orden.fecha_creacion else '—' }}</td>
+                <td>
+                  {% if orden.estado|lower == 'facturado' %}
+                    <span class="badge bg-danger">Facturado</span>
+                  {% elif orden.estado|lower == 'pendiente' %}
+                    <span class="badge bg-warning">Pendiente</span>
+                  {% elif orden.estado|lower == 'en_proceso' %}
+                    <span class="badge bg-primary">En Proceso</span>
+                  {% elif orden.estado|lower == 'finalizado' %}
+                    <span class="badge bg-success">Finalizado</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ orden.estado|title }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ orden.responsable_nombre or '—' }}</td>
+                <td>{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+                <td class="text-end fw-bold">
+                  ${{ "{:,.0f}".format(calcular_total_orden(orden)) }}
+                </td>
+                <td>
+                  <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i> Ver
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr class="fw-bold">
+                <td colspan="7" class="text-end">SUBTOTAL RELOJERIA:</td>
+                <td class="text-end">${{ "{:,.0f}".format(total_relojeria) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- LABORATORIO DE ENSAMBLES -->
+      {% if ordenes_ensambles %}
+      <div class="mb-4">
+        <h4 class="text-success mb-3">
+          <i class="bi bi-cpu"></i> Laboratorio de Ensambles
+          <span class="badge bg-success">{{ ordenes_ensambles|length }} ordenes</span>
+        </h4>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-success">
+              <tr>
+                <th># Orden</th>
+                <th>Cliente</th>
+                <th>Sucursal</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Responsable</th>
+                <th>Tecnico</th>
+                <th>Valor Total</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for orden in ordenes_ensambles %}
+              <tr>
+                <td><strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></td>
+                <td>{{ orden.client.nombre if orden.client else '—' }}</td>
+                <td>{{ orden.branch.nombre if orden.branch else '—' }}</td>
+                <td>{{ orden.fecha_creacion|local_date if orden.fecha_creacion else '—' }}</td>
+                <td>
+                  {% if orden.estado|lower == 'facturado' %}
+                    <span class="badge bg-danger">Facturado</span>
+                  {% elif orden.estado|lower == 'pendiente' %}
+                    <span class="badge bg-warning">Pendiente</span>
+                  {% elif orden.estado|lower == 'en_proceso' %}
+                    <span class="badge bg-primary">En Proceso</span>
+                  {% elif orden.estado|lower == 'finalizado' %}
+                    <span class="badge bg-success">Finalizado</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ orden.estado|title }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ orden.responsable_nombre or '—' }}</td>
+                <td>{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+                <td class="text-end fw-bold">
+                  ${{ "{:,.0f}".format(calcular_total_orden(orden)) }}
+                </td>
+                <td>
+                  <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i> Ver
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr class="fw-bold">
+                <td colspan="7" class="text-end">SUBTOTAL ENSAMBLES:</td>
+                <td class="text-end">${{ "{:,.0f}".format(total_ensambles) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- VENDEDORES - Una sección por cada vendedor -->
+      {% for vendedor_nombre in vendedores_list %}
+        {% set ordenes_vendedor = ordenes_por_vendedor[vendedor_nombre] %}
+        {% if ordenes_vendedor %}
+        <div class="mb-4">
+          <h4 class="text-info mb-3">
+            <i class="bi bi-person-badge"></i> {{ vendedor_nombre }}
+            <span class="badge bg-info">{{ ordenes_vendedor|length }} ordenes</span>
+          </h4>
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle mb-0">
+              <thead class="table-info">
+                <tr>
+                  <th># Orden</th>
+                  <th>Cliente</th>
+                  <th>Sucursal</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Responsable</th>
+                  <th>Valor Total</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for orden in ordenes_vendedor %}
+                <tr>
+                  <td><strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></td>
+                  <td>{{ orden.client.nombre if orden.client else '—' }}</td>
+                  <td>{{ orden.branch.nombre if orden.branch else '—' }}</td>
+                  <td>{{ orden.fecha_creacion|local_date if orden.fecha_creacion else '—' }}</td>
+                  <td>
+        {% if orden.estado|lower == 'facturado' %}
+          <span class="badge bg-danger">Facturado</span>
+                    {% elif orden.estado|lower == 'pendiente' %}
+                      <span class="badge bg-warning">Pendiente</span>
+                    {% elif orden.estado|lower == 'en_proceso' %}
+                      <span class="badge bg-primary">En Proceso</span>
+                    {% elif orden.estado|lower == 'finalizado' %}
+                      <span class="badge bg-success">Finalizado</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ orden.estado|title }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ orden.responsable_nombre or '—' }}</td>
+                  <td class="text-end fw-bold">${{ "{:,.0f}".format(calcular_total_orden(orden)) }}</td>
+                  <td>
+                    <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-info">
+                      <i class="bi bi-eye"></i> Ver
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+                <tfoot class="table-light">
+                <tr class="fw-bold">
+                  <td colspan="6" class="text-end">SUBTOTAL {{ vendedor_nombre|upper }}:</td>
+                  <td class="text-end">${{ "{:,.0f}".format(totales_por_vendedor[vendedor_nombre]) }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+
+      <!-- LISTADO GENERAL DE OT FILTRADAS POR ESTADO -->
+      {% if filtros.estado and filtros.estado|lower == 'facturada' and ordenes %}
+      <div class="mb-5">
+        <h4 class="text-danger mb-3">
+          <i class="bi bi-receipt"></i> Órdenes de Trabajo Facturadas
+          <span class="badge bg-danger">{{ ordenes|length }} ordenes</span>
+        </h4>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-danger">
+              <tr>
+                <th># Orden</th>
+                <th>Cliente</th>
+                <th>Sucursal</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Responsable</th>
+                <th>Tecnico</th>
+                <th>Valor Total</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for orden in ordenes %}
+              <tr>
+                <td><strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></td>
+                <td>{{ orden.client.nombre if orden.client else '—' }}</td>
+                <td>{{ orden.branch.nombre if orden.branch else '—' }}</td>
+                <td>{{ orden.fecha_entrega|local_date if orden.fecha_entrega else (orden.fecha_creacion|local_date if orden.fecha_creacion else '—') }}</td>
+                <td>
+                  {% if orden.estado|lower == 'facturado' %}
+                    <span class="badge bg-danger">Facturado</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ orden.estado|title }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ orden.responsable_nombre or '—' }}</td>
+                <td>{{ orden.tecnico.username if orden.tecnico else '—' }}</td>
+                <td class="text-end fw-bold">${{ "{:,.0f}".format(calcular_total_orden(orden)) }}</td>
+                <td>
+                  <a href="{{ url_for('ordenes.ver_orden', orden_id=orden.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i> Ver
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- DEBUG: Mostrar estados de las OT filtradas -->
+      {% if filtros.estado and ordenes %}
+        <div class="alert alert-info">
+          <strong>Estados de las OT filtradas:</strong>
+          <ul>
+            {% for orden in ordenes %}
+              <li>
+                {{ orden.consecutivo or ('#' ~ orden.id) }} —
+                    {% if orden.estado|lower == 'facturado' %}
+                      <span class="badge bg-danger">Facturado</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ orden.estado|title }}</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Mensaje si no hay datos -->
+      {% if not ordenes_relojeria and not ordenes_ensambles and not ordenes_por_vendedor %}
+      <div class="text-center py-5">
+        <div class="text-muted">
+          <i class="bi bi-search" style="font-size: 3rem;"></i>
+          <h4>No se encontraron ordenes</h4>
+          <p>No hay ordenes de trabajo que coincidan con los filtros aplicados.</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Total General Final -->
+      {% if ordenes %}
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card border-0 shadow-sm bg-dark text-white">
+            <div class="card-body text-center py-3">
+              <h4 class="mb-0 fw-bold">
+                <i class="bi bi-calculator"></i> 
+                TOTAL GENERAL: ${{ "{:,.0f}".format(total_reparaciones) }}
+              </h4>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if ordenes %}
+      <div class="mt-3 d-flex justify-content-between align-items-center d-print-none">
+        <div class="text-muted small">
+          <i class="bi bi-info-circle"></i> 
+          {{ ordenes|length }} orden(es) encontrada(s)
+          {% if filtros.fecha_inicio or filtros.fecha_fin %}
+          <br>Período: 
+          {{ filtros.fecha_inicio|default('Inicio') }} - {{ filtros.fecha_fin|default('Hoy') }}
+          {% endif %}
+        </div>
+        <button onclick="openPrintView()" class="btn btn-dark">
+          <i class="bi bi-printer"></i> Imprimir Reporte
+        </button>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+function openPrintView(){
+  // Construir query string con los filtros actuales
+  const params = new URLSearchParams();
+  const sitio = document.querySelector('#sitio')?.value;
+  const estado = document.querySelector('#estado')?.value;
+  const fecha_inicio = document.querySelector('#fecha_inicio')?.value;
+  const fecha_fin = document.querySelector('#fecha_fin')?.value;
+  if(sitio) params.set('sitio', sitio);
+  if(estado) params.set('estado', estado);
+  if(fecha_inicio) params.set('fecha_inicio', fecha_inicio);
+  if(fecha_fin) params.set('fecha_fin', fecha_fin);
+  const url = window.location.pathname.replace(/\/$/, '') + '/print' + (params.toString() ? ('?' + params.toString()) : '');
+  window.open(url, '_blank');
+}
+</script>
+
+<style>
+/* Formato de lista profesional - simple y claro */
+@media print {
+  @page {
+    size: letter;
+    margin: 20mm;
+  }
+  
+  body {
+    font-family: Arial, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+    background: white !important;
+  }
+  
+  /* Ocultar UI */
+  .btn, .card-header, .dropdown, form, .d-print-none,
+  nav, .navbar, footer, .modal, .bg-light, input, select, button, .bi {
+    display: none !important;
+  }
+  
+  .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+  
+  .card-body {
+    padding: 0 !important;
+  }
+  
+  /* Encabezado */
+  .card-body::before {
+    content: 'REPORTE DE REPARACIONES';
+    display: block;
+    text-align: center;
+    font-size: 18pt;
+    font-weight: bold;
+    margin-bottom: 8mm;
+    padding-bottom: 3mm;
+    border-bottom: 2px solid #000;
+  }
+  
+  /* Info de filtros aplicados */
+  .text-muted.small {
+    display: block !important;
+    font-size: 9pt !important;
+    margin-bottom: 5mm !important;
+    padding: 2mm 3mm !important;
+    border-left: 3px solid #000 !important;
+    background: #f5f5f5 !important;
+  }
+  
+  /* Resumen en formato compacto horizontal */
+  .row.g-3:first-of-type {
+    display: block !important;
+    margin-bottom: 6mm !important;
+    padding: 3mm !important;
+    border: 2px solid #000 !important;
+    background: #f9f9f9 !important;
+  }
+  
+  .row.g-3:first-of-type::before {
+    content: 'RESUMEN GENERAL';
+    display: block;
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 2mm;
+    text-align: center;
+  }
+  
+  .row.g-3:first-of-type .col-md-3 {
+    display: inline-block !important;
+    width: 24% !important;
+    margin: 0 0.5% 0 0 !important;
+    vertical-align: top !important;
+    text-align: center !important;
+    border-right: 1px solid #ccc !important;
+  }
+  
+  .row.g-3:first-of-type .col-md-3:last-child {
+    border-right: none !important;
+  }
+  
+  .card.bg-success {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  .card.bg-success .card-body {
+    padding: 0 !important;
+  }
+  
+  .card.bg-success h6 {
+    font-size: 8pt !important;
+    margin: 0 0 1mm 0 !important;
+    font-weight: normal !important;
+    color: #666 !important;
+  }
+  
+  .card.bg-success h4,
+  .card.bg-success h5 {
+    font-size: 12pt !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+  }
+  
+  .card.bg-success small {
+    font-size: 7pt !important;
+    color: #999 !important;
+  }
+  
+  /* Vendedores compacto */
+  .row.g-3:nth-of-type(2) {
+    display: block !important;
+    margin-bottom: 6mm !important;
+    padding: 2mm 3mm !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .row.g-3:nth-of-type(2)::before {
+    content: 'DETALLE POR VENDEDOR: ';
+    display: inline;
+    font-weight: bold;
+    font-size: 9pt;
+  }
+  
+  .row.g-3:nth-of-type(2) .col-md-3,
+  .row.g-3:nth-of-type(2) .col-sm-6 {
+    display: inline !important;
+    width: auto !important;
+    margin: 0 !important;
+  }
+  
+  .row.g-3:nth-of-type(2) .col-md-3::after,
+  .row.g-3:nth-of-type(2) .col-sm-6::after {
+    content: ' • ';
+  }
+  
+  .row.g-3:nth-of-type(2) .col-md-3:last-child::after,
+  .row.g-3:nth-of-type(2) .col-sm-6:last-child::after {
+    content: '';
+  }
+  
+  /* Títulos de sección */
+  h4 {
+    font-size: 11pt !important;
+    font-weight: bold !important;
+    margin: 8mm 0 3mm 0 !important;
+    padding: 2mm 0 1mm 3mm !important;
+    border-left: 4px solid #000 !important;
+    background: #f0f0f0 !important;
+    text-transform: uppercase !important;
+    page-break-after: avoid !important;
+  }
+  
+  h4 .badge {
+    font-size: 8pt !important;
+    font-weight: normal !important;
+    padding: 1mm 2mm !important;
+    background: white !important;
+    border: 1px solid #666 !important;
+  }
+  
+  /* FORMATO DE LISTA en lugar de tabla */
+  .table-responsive {
+    page-break-inside: auto !important;
+  }
+  
+  .table {
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    font-size: 9pt !important;
+    margin: 2mm 0 6mm 0 !important;
+  }
+  
+  .table thead {
+    display: none !important;
+  }
+  
+  .table tbody {
+    display: block !important;
+  }
+  
+  .table tbody tr {
+    display: block !important;
+    margin-bottom: 4mm !important;
+    padding: 3mm !important;
+    border: 1px solid #000 !important;
+    background: white !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .table tbody tr:nth-child(odd) {
+    background: #f9f9f9 !important;
+  }
+  
+  .table tbody td {
+    display: block !important;
+    border: none !important;
+    padding: 0.5mm 0 !important;
+    text-align: left !important;
+  }
+  
+  .table tbody td::before {
+    font-weight: bold !important;
+    color: #666 !important;
+    width: 25mm !important;
+    display: inline-block !important;
+  }
+  
+  .table tbody td:nth-child(1)::before {
+    content: 'Orden: ';
+  }
+  
+  .table tbody td:nth-child(2)::before {
+    content: 'Cliente: ';
+  }
+  
+  .table tbody td:nth-child(3)::before {
+    content: 'Sucursal: ';
+  }
+  
+  .table tbody td:nth-child(4)::before {
+    content: 'Fecha: ';
+  }
+  
+  .table tbody td:nth-child(5)::before {
+    content: 'Estado: ';
+  }
+  
+  .table tbody td:nth-child(6)::before {
+    content: 'Responsable: ';
+  }
+  
+  .table tbody td:nth-child(7)::before {
+    content: 'Técnico: ';
+  }
+  
+  .table tbody td:nth-child(8)::before {
+    content: 'Total: ';
+  }
+  
+  .table tbody td:nth-child(9) {
+    display: none !important;
+  }
+  
+  .table tbody td:first-child {
+    font-size: 11pt !important;
+    font-weight: bold !important;
+    margin-bottom: 1mm !important;
+    border-bottom: 1px solid #ddd !important;
+    padding-bottom: 1mm !important;
+  }
+  
+  .table tbody td:last-child {
+    font-size: 10pt !important;
+    font-weight: bold !important;
+    margin-top: 1mm !important;
+    padding-top: 1mm !important;
+    border-top: 1px solid #ddd !important;
+  }
+  
+  /* Para tablas info (vendedores) - menos columnas */
+  .table-info tbody td:nth-child(7) {
+    display: none !important;
+  }
+  
+  .table-info tbody td:nth-child(8)::before {
+    content: 'Total: ';
+  }
+  
+  /* Footer de totales */
+  .table tfoot {
+    display: block !important;
+    margin-top: 3mm !important;
+    padding: 3mm !important;
+    background: #000 !important;
+    color: white !important;
+  }
+  
+  .table tfoot tr {
+    display: block !important;
+    border: none !important;
+  }
+  
+  .table tfoot td {
+    display: inline !important;
+    border: none !important;
+    padding: 0 !important;
+    color: white !important;
+  }
+  
+  .table tfoot td:first-child {
+    font-weight: normal !important;
+  }
+  
+  /* Badges minimalistas */
+  .badge {
+    font-size: 8pt !important;
+    padding: 1mm 2mm !important;
+    font-weight: normal !important;
+    border: 1px solid #666 !important;
+    background: white !important;
+    color: #000 !important;
+  }
+  
+  .badge.bg-warning {
+    background: #fff !important;
+    border-color: #000 !important;
+  }
+  
+  .badge.bg-primary {
+    background: #eee !important;
+  }
+  
+  .badge.bg-success {
+    background: #000 !important;
+    color: white !important;
+  }
+  
+  /* Formato de totales */
+  .text-end {
+    text-align: left !important;
+  }
+  
+  .fw-bold {
+    font-weight: bold !important;
+  }
+  
+  /* Total general */
+  .card.bg-dark {
+    background: #000 !important;
+    color: white !important;
+    border: none !important;
+    margin-top: 8mm !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .card.bg-dark .card-body {
+    padding: 4mm !important;
+    text-align: center !important;
+  }
+  
+  .card.bg-dark h4 {
+    font-size: 14pt !important;
+    margin: 0 !important;
+    border: none !important;
+    color: white !important;
+    background: transparent !important;
+  }
+  
+  /* Sin datos */
+  .text-center.py-5 {
+    padding: 10mm !important;
+    border: 2px dashed #999 !important;
+    text-align: center !important;
+  }
+  
+  /* Footer */
+  .card-body::after {
+    content: 'Generado: ' attr(data-print-date);
+    display: block;
+    text-align: right;
+    font-size: 8pt;
+    color: #666;
+    margin-top: 8mm;
+    padding-top: 3mm;
+    border-top: 1px solid #ccc;
+  }
+  
+  /* Espaciado */
+  .mb-5, .mb-4 {
+    margin-bottom: 6mm !important;
+  }
+}
+
+/* Pantalla normal */
+@media screen {
+  .table tbody tr {
+    transition: background-color 0.2s;
+  }
+}
+</style>
+{% endblock %}

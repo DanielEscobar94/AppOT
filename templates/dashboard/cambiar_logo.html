@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="mb-4 fw-bold text-primary">Cambiar logo de la empresa</h3>
+  <form method="POST" enctype="multipart/form-data" class="card p-4 shadow" style="max-width:400px;">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.logo.label(class="form-label") }}
+      {{ form.logo(class="form-control") }}
+    </div>
+    <div class="mb-3">
+      {{ form.submit(class="btn btn-primary") }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Logo actual:</label><br>
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo actual" width="80" height="80" class="rounded border">
+    </div>
+  </form>
+</div>
+{% endblock %}

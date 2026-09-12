@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.dev
+.env.production
+
+# Flask/Instance
+instance/
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Uploads
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Migrations (versioned in repo)
+# migrations/versions/ is kept
+
+# Coverage
+htmlcov/
+.coverage
+coverage/

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ticket OT {{ orden.consecutivo or orden.id }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Estilos especificos para impresora POS */
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      
+      /* Margenes cero para impresora POS */
+      @page {
+        margin: 0;
+        size: {{ ot_cfg.ticket_width|default('80') }}mm auto;
+      }
+      
+      body {
+        margin: 0;
+        padding: 0;
+        width: {{ ot_cfg.ticket_width|default('80') }}mm;
+        background: white;
+        color: black;
+        font-weight: bold;
+      }
+      
+      /* Forzar blanco y negro */
+      * {
+        color: black !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      
+      .pos-ticket {
+        width: {{ ot_cfg.ticket_width|default('80') }}mm;
+        max-width: {{ ot_cfg.ticket_width|default('80') }}mm;
+        margin: 0;
+        padding: 2mm;
+        font-size: {{ ot_cfg.font_size|default(16) }}px;
+        font-weight: bold;
+      }
+    }
+    
+    /* Estilos para vista previa en pantalla */
+    @media screen {
+      body {
+        background: #f0f0f0;
+      }
+      
+      .pos-ticket {
+        background: white;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        font-size: {{ ot_cfg.font_size|default(16) }}px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Botones de accion (no se imprimen) -->
+<div class="no-print text-center mb-3 pt-3">
+  <button class="btn btn-primary me-2" onclick="window.print()">
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+  <button class="btn btn-secondary" onclick="window.close()">
+    <i class="bi bi-x-circle"></i> Cerrar
+  </button>
+</div>
+
+{% block content %}
+{% block brand %}{% endblock %}
+
+{# Macro para renderizar un ticket #}
+{% macro render_ticket(titulo_copia='') %}
+  <div class="pos-ticket mx-auto p-0 border bg-white mb-3" style="max-width:{{ ot_cfg.ticket_width|default('80') }}mm; font-size:{{ ot_cfg.font_size|default(16) }}px; font-family:Arial,Helvetica,sans-serif; margin-top:0; page-break-after: always;">
+  {% if titulo_copia %}
+  <div class="text-center fw-bold text-black mb-1" style="font-size:11px;">{{ titulo_copia }}</div>
+  {% endif %}
+  <div class="text-center fw-bold fs-5 text-black mb-1">{{ ot_cfg.header_text|default('ORDEN DE TRABAJO') }}</div>
+  <div class="text-center fw-semibold text-black mb-1" style="font-size:13px;">TICKET NO VALIDO COMO FACTURA</div>
+  <div class="text-center text-black mb-1" style="font-size:11px;">Pasados 60 dias no nos hacemos responsables del articulo. PBX: 604 444 08 01 | Email: info@servipilas.com</div>
+  <div class="text-center text-black mb-1">Consecutivo: <strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></div>
+    <div class="text-black">Fecha: {{ orden.fecha_creacion|local_datetime if orden.fecha_creacion else '—' }}</div>
+    <div class="text-black">Cliente: <strong>{{ orden.client.nombre }}</strong></div>
+    <div class="text-black">Documento: {{ orden.client.cc or orden.client.nit or '—' }}</div>
+    <div class="text-black">Tel: {{ orden.client.telefono or '—' }}</div>
+    <div class="text-black">Sucursal: {{ orden.branch.nombre }}</div>
+    <div class="text-black">Sitio de Reparacion: {{ orden.tecnico.username if orden.tecnico else '—' }}</div>
+    <div class="text-black">Responsable: {{ orden.responsable_nombre or '—' }}</div>
+  <hr class="my-1">
+    <div class="text-black"><strong>Descripcion:</strong></div>
+    <div class="text-black">{{ orden.descripcion or '—' }}</div>
+  <hr class="my-1">
+    <div class="text-black"><strong>Productos:</strong></div>
+    {% if orden.articulos_json %}
+      {# New grouped display by articles for ticket #}
+      {% set articulos = orden.articulos_json | fromjson %}
+      {% for articulo in articulos %}
+        <div class="mt-2 mb-2">
+          <div class="fw-bold text-black" style="font-size:13px; color:#000;">
+            Artículo {{ loop.index }}: {{ articulo.tipo | upper }}
+            {% if articulo.marca %} - {{ articulo.marca }}{% endif %}
+            {% if articulo.referencia %} - {{ articulo.referencia }}{% endif %}
+          </div>
+          {% if articulo.sitio_reparacion_id and sitios_dict %}
+            <div class="text-black" style="font-size:11px; color:#000; font-weight:bold;">Sitio: {{ sitios_dict.get(articulo.sitio_reparacion_id, 'N/A') }}</div>
+          {% endif %}
+          {% if articulo.descripcion %}
+            <div class="text-black" style="font-size:11px; color:#000; font-weight:bold;">Descripción: {{ articulo.descripcion }}</div>
+          {% endif %}
+          {% if articulo.caracteristicas and articulo.caracteristicas|length > 0 %}
+            <div class="text-black" style="font-size:11px; color:#000; font-weight:bold;">Características: {{ articulo.caracteristicas|join('; ') }}</div>
+          {% endif %}
+          {% if articulo.valor %}
+            <div class="text-black text-center border border-dark mt-2 mb-2 py-2" style="font-size:18px; color:#000; font-weight:bold; background-color:#f8f9fa !important;">VALOR: ${{ "{:,.0f}".format(articulo.valor).replace(",", ".") }}</div>
+          {% endif %}
+          <table class="table table-sm table-borderless text-black" style="font-size:11px; margin-top:4px;">
+            <tbody>
+              {% for prod in articulo.productos %}
+              <tr>
+                <td class="text-black" style="color:#000; font-weight:bold;">{{ prod.sku }}</td>
+                <td class="text-center text-black" style="color:#000; font-weight:bold;">x{{ prod.cantidad }}</td>
+                <td class="text-end text-black" style="color:#000; font-weight:bold;">${{ prod.precio | round(0) }}</td>
+                <td class="text-end text-black" style="color:#000; font-weight:bold;">${{ ((prod.precio * prod.cantidad) * (1 - prod.descuento / 100)) | round(0) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    {% else %}
+      {# Fallback to old flat display #}
+      <table class="table table-sm table-borderless text-black mb-1" style="font-size:12px;">
+        <thead>
+          <tr class="border-bottom">
+            <th class="text-start">Producto</th>
+            <th class="text-center">Cant</th>
+            <th class="text-end">P.Unit</th>
+            <th class="text-end">Subt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in orden.productos %}
+          <tr>
+            <td>{{ p.get_nombre_display()|upper }}{% if p.producto and p.producto.sku %} (SKU: {{ p.producto.sku }}){% endif %}</td>
+            <td class="text-center">{{ p.cantidad }}</td>
+            <td class="text-end">${{ p.precio_unitario | round(0) }}</td>
+            <td class="text-end">${{ (p.precio_unitario * p.cantidad) | round(0) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-black">No hay productos</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+    <hr>
+    
+    {# Calcular totales #}
+    {% set ns = namespace(total=0, anticipos_total=0) %}
+    
+    {# Calcular total de productos/servicios #}
+    {% if orden.articulos_json %}
+      {% set articulos = orden.articulos_json | fromjson %}
+      {% for articulo in articulos %}
+        {% for prod in articulo.productos %}
+          {% set subtotal = (prod.precio * prod.cantidad) * (1 - prod.descuento / 100) %}
+          {% set ns.total = ns.total + subtotal %}
+        {% endfor %}
+      {% endfor %}
+    {% else %}
+      {% for p in orden.productos %}
+        {% set ns.total = ns.total + (p.precio_unitario * p.cantidad) %}
+      {% endfor %}
+    {% endif %}
+    
+    {# Calcular total de anticipos #}
+    {% for a in orden.anticipos %}
+      {% set ns.anticipos_total = ns.anticipos_total + (a.monto | float) %}
+    {% endfor %}
+    
+    <div class="text-black"><strong>Anticipos:</strong></div>
+    <ul class="ps-3 text-black mb-2">
+      {% for a in orden.anticipos %}
+        <li>${{ "{:,.0f}".format(a.monto).replace(",", ".") }} - {{ a.metodo_pago }}</li>
+      {% else %}
+        <li>No hay anticipos registrados</li>
+      {% endfor %}
+    </ul>
+    
+    {# Mostrar resumen de totales #}
+    {% if orden.anticipos|length > 0 or orden.estado == 'facturado' %}
+    <div class="border border-dark p-2 mt-2 mb-2" style="background-color:#f8f9fa !important;">
+      <div class="d-flex justify-content-between text-black mb-1" style="font-size:14px; font-weight:bold;">
+        <span>Total Servicio:</span>
+        <span>${{ "{:,.0f}".format(ns.total).replace(",", ".") }}</span>
+      </div>
+      
+      {# Si hay anticipos, mostrarlos #}
+      {% if orden.anticipos|length > 0 %}
+      <div class="d-flex justify-content-between text-black mb-1" style="font-size:14px; font-weight:bold;">
+        <span>Anticipo:</span>
+        <span>-${{ "{:,.0f}".format(ns.anticipos_total).replace(",", ".") }}</span>
+      </div>
+      {% endif %}
+      
+      {# Si está facturado, mostrar pago en ticket #}
+      {% if orden.estado == 'facturado' %}
+      {% set saldo_a_cobrar = ns.total - ns.anticipos_total %}
+      <div class="d-flex justify-content-between text-black mb-1" style="font-size:14px; font-weight:bold;">
+        <span>Pago en Ticket:</span>
+        <span>-${{ "{:,.0f}".format(saldo_a_cobrar).replace(",", ".") }}</span>
+      </div>
+      <hr class="my-1" style="border-top: 2px solid #000;">
+      <div class="d-flex justify-content-between text-black" style="font-size:16px; font-weight:bold; color:#008000;">
+        <span>✓ COMPLETAMENTE PAGADO</span>
+        <span>$0</span>
+      </div>
+      <div class="text-center text-black mt-1" style="font-size:12px; font-weight:bold;">Estado: PAGADO / ENTREGADO</div>
+      {% else %}
+      <hr class="my-1" style="border-top: 2px solid #000;">
+      <div class="d-flex justify-content-between text-black" style="font-size:16px; font-weight:bold;">
+        <span>SALDO PENDIENTE:</span>
+        <span>${{ "{:,.0f}".format(ns.total - ns.anticipos_total).replace(",", ".") }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    
+    {% if ot_cfg.show_signatures|default(true) %}
+    <div class="row mt-2">
+      <div class="col-12 text-center text-black">
+        <div style="height:2px;"></div>
+        <div class="border-top pt-1">Firma Cliente</div>
+      </div>
+      <div class="col-12 text-center text-black mt-4">
+        <div style="height:24px;"></div>
+        <div class="border-top pt-1">Firma Responsable</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if ot_cfg.footer_text %}
+    <hr class="my-1">
+    <div class="text-center text-black" style="font-size:11px; white-space: pre-line;">{{ ot_cfg.footer_text }}</div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# Renderizar los tickets - si es primera impresion, mostrar copias segun configuracion #}
+{% if primera_impresion and ot_cfg.copies_on_first_print|default(2) > 1 %}
+  {% set copy_labels = ot_cfg.copy_labels|default(['COPIA CLIENTE', 'COPIA TALLER']) %}
+  {% for i in range(ot_cfg.copies_on_first_print|default(2)) %}
+    {{ render_ticket(copy_labels[i] if i < copy_labels|length else ('COPIA ' ~ (i+1))) }}
+  {% endfor %}
+{% else %}
+  {{ render_ticket() }}
+{% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Imprimir automaticamente segun configuracion
+    window.addEventListener('load', function() {
+      {% if ot_cfg.auto_print|default(true) %}
+      setTimeout(function() {
+        window.print();
+      }, 500);
+      
+      // Cerrar ventana despues de imprimir
+      window.onafterprint = function() {
+        window.close();
+      };
+      {% endif %}
+    });
+  </script>
+{% endblock %}
+
+</body>
+</html>

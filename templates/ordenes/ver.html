@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% block title %}Ver Orden #{{ orden.id }}{% endblock %}
+
+
+{% block content %}
+  <div class="container mt-4">
+    <div class="card shadow rounded-4 border-0">
+      <div class="card-header bg-dark text-white fw-bold rounded-top-4">
+        <i class="bi bi-file-earmark-text"></i> Orden de Trabajo {{ orden.consecutivo or ('#' ~ orden.id) }}
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <h5>Cliente</h5>
+            <p><strong>{{ orden.client.nombre }}</strong></p>
+            <p>
+              {% if orden.client.cc %}
+                CC: {{ orden.client.cc }}
+              {% elif orden.client.nit %}
+                NIT: {{ orden.client.nit }}
+              {% else %}
+                Documento: —
+              {% endif %}
+            </p>
+            <p>{{ orden.client.correo or '—' }} | {{ orden.client.telefono or '—' }}</p>
+          </div>
+          <div class="col-md-6 text-end">
+            <h5>Informacion</h5>
+            <p>Sucursal: {{ orden.branch.nombre }}</p>
+            {% if orden.venta_rel %}
+            <p>Factura: <strong><a href="{{ url_for('sales.ver', venta_id=orden.venta_rel.id) }}">FAC-{{ orden.venta_rel.numero_factura }}</a></strong>
+            {% if orden.venta_rel.usuario %}
+              — <small>Facturada por {{ orden.venta_rel.usuario.username if orden.venta_rel.usuario.username else orden.venta_rel.usuario.email }}</small>
+            {% endif %}
+            </p>
+            {% endif %}
+            <p>Fecha: {{ orden.fecha_creacion|local_datetime if orden.fecha_creacion else '—' }}</p>
+            <p>Sitio de Reparacion: {{ orden.tecnico.username if orden.tecnico else '—' }}</p>
+            <p>Responsable: {{ orden.responsable_nombre or '—' }}</p>
+            <p>Creada por: {{ orden.created_by.username if orden.created_by else '—' }}</p>
+          </div>
+        </div>
+
+        <hr>
+        <h5>Productos</h5>
+        <div class="table-responsive">
+          {% if orden.articulos_json %}
+            {# New grouped display by articles #}
+            {% set articulos = orden.articulos_json | fromjson %}
+            {% for articulo in articulos %}
+              <div class="mb-4">
+                <h6 class="text-primary fw-bold">
+                  Artículo {{ loop.index }}: {{ articulo.tipo | upper }}
+                  {% if articulo.marca %} - {{ articulo.marca }}{% endif %}
+                  {% if articulo.referencia %} - {{ articulo.referencia }}{% endif %}
+                </h6>
+                
+                {# Mostrar sitio de reparación #}
+                {% if articulo.sitio_reparacion_id and sitios_dict %}
+                  <div class="alert alert-secondary p-2 mb-2">
+                    <i class="bi bi-geo-alt-fill"></i> <strong>Sitio de Reparación:</strong> {{ sitios_dict.get(articulo.sitio_reparacion_id, 'N/A') }}
+                  </div>
+                {% endif %}
+                
+                {# Mostrar características PRIMERO #}
+                {% if articulo.caracteristicas %}
+                  <div class="alert alert-info p-2 mb-2">
+                    <strong>Características:</strong> 
+                    {% if articulo.caracteristicas is string %}
+                      {{ articulo.caracteristicas }}
+                    {% elif articulo.caracteristicas is iterable %}
+                      {{ articulo.caracteristicas|join('; ') }}
+                    {% else %}
+                      {{ articulo.caracteristicas }}
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <div class="alert alert-warning p-2 mb-2">
+                    <small><em>Sin características registradas</em></small>
+                  </div>
+                {% endif %}
+                
+                {# Luego descripción #}
+                {% if articulo.descripcion %}
+                  <p class="text-dark small mb-2"><strong>Descripción:</strong> {{ articulo.descripcion }}</p>
+                {% endif %}
+                
+                {# Valor del artículo #}
+                {% if articulo.valor %}
+                  <p class="text-dark small mb-2"><strong>Valor del artículo:</strong> ${{ articulo.valor | round(0) }}</p>
+                {% endif %}
+                
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Producto/Servicio</th>
+                        <th>Cantidad</th>
+                        <th>Precio unitario</th>
+                        <th>Descuento</th>
+                        <th>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for prod in articulo.productos %}
+                      <tr>
+                        <td>{{ prod.sku }}</td>
+                        <td style="text-align:center;">{{ prod.cantidad }}</td>
+                        <td>${{ prod.precio | round(0) }}</td>
+                        <td style="text-align:center;">{{ prod.descuento }}%</td>
+                        <td>${{ ((prod.precio * prod.cantidad) * (1 - prod.descuento / 100)) | round(0) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            {# Fallback to old flat display #}
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in orden.productos %}
+                  <tr>
+                    <td>{{ p.get_nombre_display() }}{% if p.producto and p.producto.sku %} <small style="color:#666;">(SKU: {{ p.producto.sku }})</small>{% endif %}</td>
+                    <td style="text-align:center;">{{ p.cantidad }}</td>
+                    <td>${{ p.precio_unitario | round(0) }}</td>
+                    <td>${{ (p.precio_unitario * p.cantidad) | round(0) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" class="text-center">No hay productos</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </div>
+
+        {# Totales - Resumen financiero #}
+        {% set ns = namespace(total_articulos=0, total_anticipos=0) %}
+        
+        {# Calcular total de artículos #}
+        {% if orden.articulos_json %}
+          {% set articulos = orden.articulos_json | fromjson %}
+          {% for articulo in articulos %}
+            {% for prod in articulo.productos %}
+              {% set subtotal = (prod.precio * prod.cantidad) * (1 - prod.descuento / 100) %}
+              {% set ns.total_articulos = ns.total_articulos + subtotal %}
+            {% endfor %}
+          {% endfor %}
+        {% else %}
+          {% for p in orden.productos %}
+            {% set ns.total_articulos = ns.total_articulos + (p.precio_unitario * p.cantidad) %}
+          {% endfor %}
+        {% endif %}
+        
+        {# Repuestos Implementados (solo visible en la vista web, no en ticket) #}
+        {% if repuestos|length > 0 %}
+        <hr>
+        <h5><i class="bi bi-wrench"></i> Repuestos Implementados <span class="badge bg-secondary">Interno</span></h5>
+        <div class="alert alert-info">
+          <small><i class="bi bi-info-circle"></i> Esta información es de uso interno y no aparece en el ticket del cliente.</small>
+        </div>
+        
+        {# Alerta si el costo de repuestos supera el valor de servicios #}
+        {% if total_repuestos > ns.total_articulos %}
+        <div class="alert alert-danger border-danger" role="alert">
+          <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> ¡ATENCIÓN!</h6>
+          <p class="mb-2"><strong>El costo de los repuestos (${{ "{:,.0f}".format(total_repuestos).replace(',', '.') }}) es MAYOR que el valor de los servicios (${{ "{:,.0f}".format(ns.total_articulos).replace(',', '.') }})</strong></p>
+          <hr>
+          <p class="mb-0"><small>Diferencia: <strong class="text-danger">${{ "{:,.0f}".format(total_repuestos - ns.total_articulos) }}</strong> adicionales en repuestos</small></p>
+        </div>
+        {% endif %}
+        
+        {# Alerta si el costo de repuestos supera el valor del servicio #}
+        {% if total_repuestos > ns.total_articulos %}
+        <div class="alert alert-warning border-warning">
+          <i class="bi bi-exclamation-triangle-fill"></i> <strong>¡ATENCIÓN!</strong> 
+          El costo de los repuestos (<strong>${{ "{:,.0f}".format(total_repuestos).replace(',', '.') }}</strong>) 
+          es mayor que el valor del servicio (<strong>${{ "{:,.0f}".format(ns.total_articulos).replace(',', '.') }}</strong>).
+          <br><small>Diferencia: <strong>${{ "{:,.0f}".format(total_repuestos - ns.total_articulos).replace(',', '.') }}</strong></small>
+        </div>
+        {% endif %}
+        
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered table-hover">
+            <thead class="table-secondary">
+              <tr>
+                <th>Repuesto</th>
+                <th>Cantidad</th>
+                <th>Costo Unitario</th>
+                <th>Costo Total</th>
+                <th>Registrado por</th>
+                <th>Notas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for repuesto in repuestos %}
+              <tr>
+                <td>{{ repuesto.nombre or '—' }}</td>
+                <td class="text-center">{{ repuesto.cantidad }}</td>
+                <td class="text-end">${{ "{:,.0f}".format(repuesto.costo_unitario or 0) }}</td>
+                <td class="text-end">${{ "{:,.0f}".format(repuesto.costo_total or 0) }}</td>
+                <td><small>{{ repuesto.registrado_por.username if repuesto.registrado_por else '—' }}</small></td>
+                <td><small>{{ repuesto.notas_privadas or '—' }}</small></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <th colspan="3" class="text-end">Total Costo Repuestos:</th>
+                <th class="text-end">${{ "{:,.0f}".format(total_repuestos) }}</th>
+                <th colspan="2"></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% endif %}
+        
+        {# Calcular total de anticipos #}
+        {% for a in orden.anticipos %}
+          {% set ns.total_anticipos = ns.total_anticipos + (a.monto | float) %}
+        {% endfor %}
+        
+        {# Calcular saldo pendiente #}
+        {% set saldo_pendiente = (ns.total_articulos | float) - (ns.total_anticipos | float) %}
+        
+        <div class="mt-4 p-3 bg-light border rounded">
+          <div class="row">
+            <div class="col-md-6">
+              <p class="mb-1">Total artículos: <span class="fw-bold text-success">${{ ns.total_articulos | round(0) | int }}</span></p>
+              <p class="mb-0">Total anticipos: <span class="fw-bold text-danger">-${{ ns.total_anticipos | round(0) | int }}</span></p>
+            </div>
+            <div class="col-md-6 text-end">
+              <h4 class="mb-0">
+                <span class="text-muted">Saldo pendiente:</span>
+                <span class="fw-bold text-primary">${{ saldo_pendiente | round(0) | int }}</span>
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+        <h5>Anticipos</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Pendientes</h6>
+            <ul class="list-unstyled">
+              {% set any_pend = false %}
+              {% for a in orden.anticipos %}
+                {% if not a.venta_id %}
+                  {% set any_pend = true %}
+                  <li class="d-flex align-items-center justify-content-between mb-1">
+                    <span>${{ a.monto | int }} - {{ a.metodo_pago }}
+                      {% if a.numero_factura_siigo %}<small class="text-muted ms-1">(Siigo: {{ a.numero_factura_siigo }})</small>{% endif %}
+                    </span>
+                    {% if current_user.rol in ('admin', 'supervisor') %}
+                    <button class="btn btn-danger btn-sm ms-2 btn-eliminar-anticipo"
+                            data-id="{{ a.id }}"
+                            title="Eliminar anticipo">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                    {% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+              {% if not any_pend %}
+                <li>No hay anticipos pendientes</li>
+              {% endif %}
+            </ul>
+          </div>
+          <div class="col-md-6">
+            <h6>Aplicados</h6>
+            <ul>
+              {% set any_app = false %}
+              {% for a in orden.anticipos %}
+                {% if a.venta_id %}
+                  {% set any_app = true %}
+                  <li>${{ a.monto }} - {{ a.metodo_pago }} — Venta: <a href="{{ url_for('sales.ver', venta_id=a.venta_id) }}">#{{ a.venta_id }}</a></li>
+                {% endif %}
+              {% endfor %}
+              {% if not any_app %}
+                <li>No hay anticipos aplicados</li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+
+        {% if current_user.rol in ('admin', 'supervisor') %}
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.btn-eliminar-anticipo').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                if (!confirm('¿Está seguro de eliminar este anticipo? Esta acción no se puede deshacer.')) return;
+                var anticipoId = this.getAttribute('data-id');
+                var csrfToken = document.querySelector('meta[name="csrf-token"]')
+                  ? document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                  : (document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : '');
+                var row = this.closest('li');
+                fetch('/anticipos/' + anticipoId + '/delete', {
+                  method: 'POST',
+                  headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                  if (data.ok) {
+                    if (row) row.remove();
+                  } else {
+                    alert('Error al eliminar: ' + (data.error || 'Error desconocido'));
+                  }
+                })
+                .catch(function () { alert('Error de comunicación al eliminar el anticipo.'); });
+              });
+            });
+          });
+        </script>
+        {% endif %}
+
+        <div class="mt-4 text-end">
+          <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-secondary" id="btn-volver-ot">Volver</a>
+          <script>
+            (function() {
+              var params = new URLSearchParams(window.location.search);
+              if (params.get('ref') === 'reparaciones') {
+                var returnUrl = sessionStorage.getItem('reportes_reparaciones_return_url');
+                if (returnUrl) {
+                  document.getElementById('btn-volver-ot').href = returnUrl;
+                }
+              }
+            })();
+          </script>
+          {# Si la orden esta facturada (tiene venta_rel), no mostrar controles de edicion/estado #}
+          {% if not orden.venta_rel %}
+            {% if current_user.rol in ['admin', 'supervisor', 'tecnico'] or (current_user.rol == 'vendedor' and orden.tecnico_id == current_user.id) %}
+              <a href="{{ url_for('ordenes.editar_orden', orden_id=orden.id) }}" class="btn btn-warning ms-2">Editar</a>
+            {% endif %}
+            {% if current_user.rol in ['admin', 'supervisor', 'tecnico'] or (current_user.rol == 'vendedor' and orden.tecnico_id == current_user.id) %}
+            <form method="POST" action="{{ url_for('ordenes.actualizar_estado', orden_id=orden.id) }}" class="d-inline-block ms-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+              <input type="hidden" name="consecutivo" value="{{ orden.consecutivo }}">
+              <select name="estado_servicio" class="form-select d-inline-block" style="width:auto; display:inline-block;">
+                <option value="pendiente" {% if orden.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="en_proceso" {% if orden.estado == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                <option value="finalizado" {% if orden.estado == 'finalizado' %}selected{% endif %}>Finalizado</option>
+              </select>
+              <button type="submit" class="btn btn-sm btn-primary">Actualizar estado</button>
+            </form>
+            {% endif %}
+          {% else %}
+            {# Orden facturada: solo mostrar Volver y una nota informativa #}
+            <span class="badge bg-info ms-2">Facturada</span>
+          {% endif %}
+
+          <!-- Botón para imprimir (siempre visible para reimprimir el ticket) -->
+          <a href="{{ url_for('ordenes.ticket_orden', orden_id=orden.id) }}" target="_blank" rel="noopener" class="btn btn-primary ms-2" id="btn-imprimir-ticket" title="Imprimir esta orden">Imprimir</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Bloque POS oculto en pantalla, se mostrara solo en la impresion #}
+  <div class="pos-ticket" style="max-width:88mm; margin:auto; font-size:16px; font-weight: bold; background:white; border:1px solid #ccc; padding:10px; display:none;">
+    <div style="text-align:center; font-weight:bold; font-size:16px;">ORDEN DE TRABAJO</div>
+    <div style="text-align:center; color:#a00; font-weight:600; margin-top:6px;">TICKET NO VALIDO COMO FACTURA</div>
+    <div style="text-align:center; font-size:12px; color:#333; margin-bottom:6px;">Pasados 60 dias no nos hacemos responsables del articulo. PBX: 604 444 08 01 | Email: info@servipilas.com</div>
+    <div style="text-align:center; margin-bottom:8px;">Consecutivo: <strong>{{ orden.consecutivo or ('#' ~ orden.id) }}</strong></div>
+  <div>Fecha: {{ orden.fecha_creacion|local_datetime if orden.fecha_creacion else '—' }}</div>
+    <div>Cliente: <strong>{{ orden.client.nombre }}</strong></div>
+    <div>Documento: {{ orden.client.cc or orden.client.nit or '—' }}</div>
+    <div>Tel: {{ orden.client.telefono or '—' }}</div>
+    <div>Sucursal: {{ orden.branch.nombre }}</div>
+    <div>Marca: {{ orden.marca or '—' }}</div>
+    <div>Referencia: {{ orden.referencia or '—' }}</div>
+  <div>Estado del equipo: {% if orden.estado_equipo %}{{ orden.estado_equipo.name if orden.estado_equipo.name else (orden.estado_equipo.value if orden.estado_equipo.value else '—') }}{% else %}—{% endif %}</div>
+  <div>Caracteristicas del Articulo: {% if orden.caracteristicas_articulo %}{{ orden.caracteristicas_articulo }}{% elif orden.estado_equipo %}{{ orden.estado_equipo.name if orden.estado_equipo.name else (orden.estado_equipo.value if orden.estado_equipo.value else '—') }}{% else %}—{% endif %}</div>
+    <div>Sitio de Reparacion: {{ orden.tecnico.username if orden.tecnico else '—' }}</div>
+    <div>Creada por: {{ orden.created_by.username if orden.created_by else '—' }}</div>
+    <hr>
+    <div><strong>Descripcion:</strong></div>
+    <div>{{ orden.descripcion or '—' }}</div>
+    <hr>
+    <div><strong>Productos:</strong></div>
+    {% if orden.articulos_json %}
+      {# New grouped display by articles for ticket #}
+      {% set articulos = orden.articulos_json | fromjson %}
+      {% for articulo in articulos %}
+        <div style="margin-top:8px; margin-bottom:8px;">
+          <div style="font-weight:bold; font-size:13px;">
+            Artículo {{ loop.index }}: {{ articulo.tipo | upper }}
+            {% if articulo.marca %}{{ articulo.marca }}{% endif %}
+            {% if articulo.referencia %}{{ articulo.referencia }}{% endif %}
+          </div>
+          {% if articulo.sitio_reparacion_id and sitios_dict %}
+            <div style="font-size:11px;"><strong>Sitio:</strong> {{ sitios_dict.get(articulo.sitio_reparacion_id, 'N/A') }}</div>
+          {% endif %}
+          {% if articulo.valor %}
+            <div style="font-size:11px;">Valor: ${{ articulo.valor | round(0) }}</div>
+          {% endif %}
+          <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
+            <tbody>
+              {% for prod in articulo.productos %}
+              <tr>
+                <td style="padding:2px;">{{ prod.sku }}</td>
+                <td style="text-align:center; padding:2px;">x{{ prod.cantidad }}</td>
+                <td style="text-align:right; padding:2px;">${{ prod.precio | round(0) }}</td>
+                <td style="text-align:right; padding:2px;">${{ ((prod.precio * prod.cantidad) * (1 - prod.descuento / 100)) | round(0) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    {% else %}
+      {# Fallback to old flat display #}
+      <table style="width:100%; font-size:12px; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid #ccc;">
+            <th style="text-align:left;">Producto</th>
+            <th style="text-align:center;">Cant</th>
+            <th style="text-align:right;">P.Unit</th>
+            <th style="text-align:right;">Subt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in orden.productos %}
+          <tr>
+            <td>{{ p.get_nombre_display() }}{% if p.producto and p.producto.sku %} (SKU: {{ p.producto.sku }}){% endif %}</td>
+            <td style="text-align:center;">{{ p.cantidad }}</td>
+            <td style="text-align:right;">${{ p.precio_unitario | round(0) }}</td>
+            <td style="text-align:right;">${{ (p.precio_unitario * p.cantidad) | round(0) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;">No hay productos</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+    <hr>
+    <div><strong>Anticipos:</strong></div>
+    <ul style="padding-left:16px;">
+      {% for a in orden.anticipos %}
+        <li>{{ a.monto }} - {{ a.metodo_pago }}</li>
+      {% else %}
+        <li>No hay anticipos registrados</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <style>
+  .pos-ticket { display:none; }
+  @media print {
+    body * { visibility: hidden; }
+    .pos-ticket, .pos-ticket * { visibility: visible; }
+    .pos-ticket { display:block !important; position: absolute; left: 0; top: 0; width: 88mm !important; }
+    .btn, .btn-sm, .btn-primary { display: none !important; }
+  }
+  </style>
+  <script>
+    // If redirected with ?created=1, show a success toast confirming creation
+    (function(){
+      try{
+        var params = new URLSearchParams(window.location.search);
+        if(params.get('created') === '1'){
+          // Limpiar el auto-guardado del localStorage ya que la orden se creó exitosamente
+          try {
+            localStorage.removeItem('ot_formulario_temp');
+            console.log('Auto-guardado eliminado tras creación exitosa');
+          } catch(e) {
+            console.error('Error al limpiar auto-guardado:', e);
+          }
+          
+          window.addEventListener('DOMContentLoaded', function(){
+            try{ window.showToast('Orden creada con exito', 'success'); } catch(e){}
+            
+            // Limpiar localStorage de la orden temporal al cargar esta página desde "crear"
+            try {
+              localStorage.removeItem('orden_trabajo_temp');
+              console.log('LocalStorage limpiado en ver orden después de crear');
+            } catch(e) {
+              console.warn('Error al limpiar localStorage:', e);
+            }
+            
+            // Modificar el botón "Volver" para que limpie el localStorage al regresar
+            var btnVolver = document.querySelector('button.btn-secondary');
+            if (btnVolver) {
+              btnVolver.onclick = function(e) {
+                e.preventDefault();
+                window.location.href = '{{ url_for("ordenes.crear_orden") }}?from_created=1';
+              };
+              btnVolver.innerHTML = '<i class="bi bi-plus-circle"></i> Crear otra orden';
+              btnVolver.className = 'btn btn-success';
+            }
+          });
+        }
+      }catch(e){}
+    })();
+  </script>
+{% endblock %}

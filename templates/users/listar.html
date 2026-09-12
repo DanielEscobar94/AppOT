@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Usuarios</h2>
+
+<div class="d-flex justify-content-between mb-3">
+  <a href="{{ url_for('users.nuevo') }}" class="btn btn-success">Nuevo Usuario</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>Nombre</th>
+        <th>Correo</th>
+        <th>Rol</th>
+        <th>Sucursal</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>{{ u.username or '' }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.rol }}</td>
+        <td>{{ u.branch.nombre if u.branch else 'Sin sucursal' }}</td>
+        <td>
+          {% if current_user.rol == 'admin' %}
+            <a href="{{ url_for('users.editar', id=u.id) }}" class="btn btn-sm btn-primary">Editar</a>
+            {% if u.id != current_user.id %}
+              <form method="POST" action="{{ url_for('users.eliminar', id=u.id) }}" style="display:inline-block;" onsubmit="return confirm('¿Eliminar usuario?');">
+                {{ delete_form.csrf_token }}
+                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="text-center">No hay usuarios registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

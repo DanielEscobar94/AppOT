@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+
+{% block title %}Cuadre de Caja - {{ fecha|local_date }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-cash-coin"></i> Cuadre de Caja</h2>
+    <div class="d-flex gap-2">
+      <button onclick="window.print()" class="btn btn-primary">
+        <i class="bi bi-printer"></i> Imprimir
+      </button>
+      {% if not cierre_existente %}
+      <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCerrarTurno">
+        <i class="bi bi-lock"></i> Cerrar Turno
+      </button>
+      {% endif %}
+      <a href="{{ url_for('caja.historial') }}" class="btn btn-secondary">
+        <i class="bi bi-clock-history"></i> Historial
+      </a>
+    </div>
+  </div>
+
+  {% if cierre_existente %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> 
+    <strong>Turno Cerrado:</strong> Este cuadre ya fue cerrado el {{ cierre_existente.fecha_cierre|local_datetime('%d/%m/%Y a las %H:%M') }} 
+    por {{ cierre_existente.usuario.username if cierre_existente.usuario else 'Usuario' }}.
+    Los valores están congelados y no cambian aunque se apliquen anticipos posteriormente.
+  </div>
+  {% endif %}
+  {% if cuadre.congelado %}
+  <div class="alert alert-secondary">
+    <i class="bi bi-snowflake"></i> 
+    <strong>Datos congelados:</strong> Los totales mostrados corresponden al momento del cierre.
+  </div>
+  {% endif %}
+
+  <div class="row">
+    <!-- Informacion General -->
+    <div class="col-md-4 mb-4">
+      <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0"><i class="bi bi-info-circle"></i> Informacion General</h5>
+        </div>
+        <div class="card-body">
+          <p><strong>Fecha:</strong> {{ fecha|local_date }}</p>
+          <p><strong>Sucursal:</strong> {{ sucursal.nombre }}</p>
+          <p><strong>Usuario:</strong> {{ current_user.username }}</p>
+          <p><strong>Hora:</strong> {{ moment().format('HH:mm') }}</p>
+          <p><strong>Cantidad de Ventas:</strong> {{ cuadre.cantidad_ventas }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumen Financiero -->
+    <div class="col-md-8 mb-4">
+      <div class="card border-success">
+        <div class="card-header bg-success text-white">
+          <h5 class="card-title mb-0"><i class="bi bi-calculator"></i> Resumen Financiero</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <table class="table table-sm">
+                <tr>
+                  <td><strong>Total Ventas:</strong> <small class="text-muted">(valor completo)</small></td>
+                  <td class="text-end">${{ "{:,.0f}".format(cuadre.total_ventas) }}</td>
+                </tr>
+                {% if not cuadre.congelado %}
+                <tr>
+                  <td><em>Saldo cobrado hoy</em></td>
+                  <td class="text-end">${{ "{:,.0f}".format(cuadre.total_saldo_cobrado) }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                  <td><strong>Anticipos registrados hoy:</strong></td>
+                  <td class="text-end">${{ "{:,.0f}".format(cuadre.total_anticipos) }}</td>
+                </tr>
+                <tr>
+                  <td><strong>Ingresos Extra:</strong></td>
+                  <td class="text-end text-success">${{ "{:,.0f}".format(cuadre.total_ingresos_extra) }}</td>
+                </tr>
+                <tr>
+                  <td><strong>Egresos:</strong></td>
+                  <td class="text-end text-danger">-${{ "{:,.0f}".format(cuadre.total_egresos) }}</td>
+                </tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <div class="card bg-light">
+                <div class="card-body text-center">
+                  <h6 class="card-title">Efectivo Esperado</h6>
+                  <h3 class="text-primary">${{ "{:,.0f}".format(cuadre.efectivo_esperado) }}</h3>
+                  {% if cierre_existente %}
+                  <hr>
+                  <p class="mb-1"><strong>Efectivo Contado:</strong> ${{ "{:,.0f}".format(cierre_existente.efectivo_contado or 0) }}</p>
+                  <p class="mb-0">
+                    <strong>Diferencia:</strong> 
+                    <span class="{% if (cierre_existente.diferencia or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      ${{ "{:,.0f}".format(cierre_existente.diferencia or 0) }}
+                    </span>
+                  </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Detalle de Ventas -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-receipt"></i> Detalle de Ventas</h5>
+        </div>
+        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+          {% if cuadre.ventas_detalle %}
+          <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Factura</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for venta in cuadre.ventas_detalle %}
+              <tr>
+                <td>{{ venta.fecha|local_time }}</td>
+                <td>FAC-{{ venta.numero_factura }}</td>
+                <td class="text-end">${{ "{:,.0f}".format(venta.total) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          {% else %}
+          <p class="text-muted text-center">No hay ventas registradas para esta fecha</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Movimientos de Caja -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-arrow-up-down"></i> Movimientos de Caja</h5>
+        </div>
+        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+          {% if cuadre.movimientos %}
+          <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Descripcion</th>
+                <th>Tipo</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for mov in cuadre.movimientos %}
+              <tr>
+                <td>{{ mov.fecha|local_time }}</td>
+                <td>{{ mov.descripcion[:25] }}</td>
+                <td>
+                  <span class="badge {% if mov.tipo == 'ingreso' %}bg-success{% else %}bg-danger{% endif %}">
+                    {{ mov.tipo.title() }}
+                  </span>
+                </td>
+                <td class="text-end">${{ "{:,.0f}".format(mov.monto) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          {% else %}
+          <p class="text-muted text-center">No hay movimientos de caja registrados</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFORMACIÓN SIIGO (Separada, solo informativa) -->
+  {% if cuadre.total_anticipos_siigo > 0 or cuadre.anticipos_siigo_detalle %}
+  <div class="row">
+    <div class="col-12 mb-4">
+      <div class="card border-warning" style="border-width: 2px;">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-info-circle"></i> 
+            <strong>Información Siigo (No afecta este cuadre)</strong>
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-warning mb-3">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Nota:</strong> Los anticipos por <strong>Tarjeta</strong> y <strong>Transferencia</strong> se contabilizan en el sistema Siigo y NO afectan el cuadre de caja AppOT. 
+            Esta información es solo para auditoría.
+          </div>
+
+          {% if cuadre.anticipos_siigo_detalle %}
+          <div class="row">
+            <div class="col-md-6">
+              <table class="table table-sm">
+                <thead>
+                  <tr class="table-warning">
+                    <th>Hora</th>
+                    <th>OT</th>
+                    <th>Método</th>
+                    <th class="text-end">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for anticipo in cuadre.anticipos_siigo_detalle %}
+                  <tr>
+                    <td>{{ anticipo.fecha|local_time }}</td>
+                    <td>{{ anticipo.orden.consecutivo if anticipo.orden else '-' }}</td>
+                    <td>
+                      <span class="badge bg-info">{{ anticipo.metodo_pago.title() }}</span>
+                    </td>
+                    <td class="text-end">${{ "{:,.0f}".format(anticipo.monto) }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <div class="card bg-light">
+                <div class="card-body text-center">
+                  <h6 class="card-title">Total Anticipos Siigo</h6>
+                  <h3 class="text-warning">${{ "{:,.0f}".format(cuadre.total_anticipos_siigo) }}</h3>
+                  <p class="text-muted small">Pendiente de facturación</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted text-center">No hay anticipos de Siigo pendientes para esta fecha</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal Cerrar Turno -->
+<div class="modal fade" id="modalCerrarTurno" tabindex="-1" aria-labelledby="modalCerrarTurnoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('caja.cerrar_turno') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="modalCerrarTurnoLabel">
+            <i class="bi bi-lock"></i> Cerrar Turno
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="fecha" value="{{ fecha|local_date('%Y-%m-%d') }}">
+          
+          <div class="alert alert-info">
+            <strong>Efectivo Esperado:</strong> ${{ "{:,.0f}".format(cuadre.efectivo_esperado) }}
+          </div>
+
+          <div class="mb-3">
+            <label for="efectivo_contado" class="form-label">
+              <strong>Efectivo Contado</strong> <span class="text-danger">*</span>
+            </label>
+            <input type="number" 
+                   class="form-control" 
+                   id="efectivo_contado" 
+                   name="efectivo_contado" 
+                   value="{{ cuadre.efectivo_esperado }}"
+                   step="1" 
+                   required>
+            <div class="form-text">Ingrese el efectivo fisico contado en caja</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="observaciones" class="form-label">Observaciones</label>
+            <textarea class="form-control" 
+                      id="observaciones" 
+                      name="observaciones" 
+                      rows="3" 
+                      placeholder="Observaciones adicionales sobre el cierre..."></textarea>
+          </div>
+
+          <div id="diferencia-preview" class="alert alert-secondary" style="display: none;">
+            <strong>Diferencia:</strong> <span id="diferencia-valor"></span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-lock"></i> Cerrar Turno
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const efectivoContadoInput = document.getElementById('efectivo_contado');
+  const diferenciaPreview = document.getElementById('diferencia-preview');
+  const diferenciaValor = document.getElementById('diferencia-valor');
+  const efectivoEsperado = {{ cuadre.efectivo_esperado }};
+
+  if (efectivoContadoInput) {
+    efectivoContadoInput.addEventListener('input', function() {
+      const contado = parseFloat(this.value) || 0;
+      const diferencia = contado - efectivoEsperado;
+      
+      diferenciaValor.textContent = '$' + diferencia.toLocaleString();
+      diferenciaValor.className = diferencia >= 0 ? 'text-success' : 'text-danger';
+      diferenciaPreview.style.display = 'block';
+    });
+
+    // Trigger inicial
+    efectivoContadoInput.dispatchEvent(new Event('input'));
+  }
+});
+</script>
+
+<style>
+@media print {
+  body {
+    font-size: 16px;
+    font-weight: bold;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+}
+</style>
+
+{% endblock %}

@@ -1,0 +1,76 @@
+# =============================================================================
+# APPOT - Entorno de DESARROLLO local
+# =============================================================================
+# USO:
+#   1. Copia .env.dev.example → .env.dev y ajusta los valores
+#   2. docker compose -f docker-compose.dev.yml up --build
+#   3. Abre http://localhost:8000
+#
+# NOTAS:
+#   - El código fuente se monta como volumen (edita en VS Code → recarga sola)
+#   - La base de datos es LOCAL y separada de producción
+#   - Para correr migraciones:
+#       docker compose -f docker-compose.dev.yml exec app flask db upgrade
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Base de datos PostgreSQL local (solo para desarrollo)
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:18-alpine
+    container_name: appot-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: appot_dev
+      POSTGRES_PASSWORD: appot_dev_password
+      POSTGRES_DB: appot_dev_db
+    volumes:
+      - appot_dev_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"   # Puerto 5433 en tu PC para no chocar con PostgreSQL local si lo tienes instalado
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appot_dev -d appot_dev_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Aplicación Flask en modo desarrollo
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: appot-dev-app
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    environment:
+      DATABASE_URL: postgresql://appot_dev:appot_dev_password@db:5432/appot_dev_db
+      FLASK_ENV: development
+      FLASK_DEBUG: "1"
+      TZ: America/Bogota
+    volumes:
+      # Monta el código fuente en vivo — los cambios se reflejan sin rebuild
+      - .:/app
+      # Excluye carpetas que no deben sobreescribirse desde el host
+      - /app/__pycache__
+      - /app/static/uploads
+      # Dependencias persistentes — se instalan solo la primera vez
+      - appot_dev_deps:/root/.local
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python -c \"from app import create_app; from extensions import db; app=create_app(); app.app_context().push(); db.create_all()\" &&
+             flask run --host=0.0.0.0 --port=8000 --reload"
+
+volumes:
+  appot_dev_pgdata:
+    name: appot_dev_pgdata
+  appot_dev_deps:
+    name: appot_dev_deps

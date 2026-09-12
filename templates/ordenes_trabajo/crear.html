@@ -1,0 +1,1153 @@
+{% extends 'base.html' %}
+{% block title %}Crear Orden de Trabajo{% endblock %}
+{% from 'snippets/search_field.html' import search_field %}
+
+{% block content %}
+<style>
+  /* Estilos para el carrito de productos */
+  .hover-bg-light:hover {
+    background-color: #f8f9fa !important;
+    transition: background-color 0.2s ease;
+  }
+
+  #productos-articulo-lista {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  #productos-sugerencias {
+    z-index: 1060 !important;
+  }
+
+  #productos-sugerencias .list-group-item {
+    transition: all 0.2s ease;
+  }
+
+  #productos-sugerencias .list-group-item:hover {
+    background-color: #0d6efd !important;
+    color: white !important;
+  }
+
+  #productos-sugerencias .list-group-item.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+  }
+
+  /* Animación para productos agregados */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  #productos-articulo-lista>div {
+    animation: slideIn 0.3s ease;
+  }
+</style>
+
+<div class="container-fluid p-4">
+  <!-- Encabezado de la hoja de recepción -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-clipboard-plus text-primary"></i>
+        Nueva Orden de Trabajo
+      </h4>
+      <p class="mb-0 small text-secondary">Hoja de recepción técnica{% if branch_nombre %} · {{ branch_nombre }}{% endif %}</p>
+    </div>
+    <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Volver al listado
+    </a>
+  </div>
+
+  <form method="POST" action="{{ url_for('ordenes.crear_orden') }}" id="form-orden-trabajo">
+    {{ form.csrf_token }}
+    <input type="hidden" name="client_id" id="client-id">
+    <!-- Campos ocultos para datos del cliente -->
+    <input type="hidden" name="cliente_cedula" id="cliente-cedula" value="">
+    <input type="hidden" name="cliente_telefono" id="cliente-telefono-hidden" value="">
+    <!-- Idempotencia: evita duplicados al reenviar/doble clic -->
+    <input type="hidden" name="idempotency_key" id="idempotency_key" value="">
+
+    <!-- Bloque 1: Datos de recepción y cliente -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-dark text-white border-0 py-3">
+        <span class="fw-bold"><i class="bi bi-person-badge me-2"></i>Recepción y cliente</span>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-lg-5 position-relative">
+            {{ search_field(input_id='buscar-cliente', input_name='cliente_nombre',
+                            results_id='client-suggestions', label='Cliente',
+                            placeholder='Buscar cliente por nombre o ID',
+                            input_class='form-control border-primary shadow-sm clients-search-input',
+                            results_class='clients-suggestions-container list-group shadow-sm',
+                            results_tag='div') }}
+          </div>
+          <div class="col-lg-3">
+            <button type="button" class="btn btn-outline-primary w-100" data-bs-toggle="modal"
+              data-bs-target="#modalNuevoCliente">
+              <i class="bi bi-person-plus me-1"></i> Nuevo cliente
+            </button>
+          </div>
+          <div class="col-lg-4">
+            <label class="small text-uppercase text-muted fw-semibold mb-1" for="responsable">Responsable</label>
+            <input type="text" name="responsable" id="responsable" class="form-control"
+              placeholder="Quien elabora la OT" required>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-lg-5">
+            <label class="small text-uppercase text-muted fw-semibold mb-1" for="categoria">Categoría de OT</label>
+            <select name="categoria" id="categoria" class="form-select">
+              <option value="">Sin categoría…</option>
+              {% for val, label in form.categoria.choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Datos del cliente seleccionado -->
+        <div id="datos-cliente" class="card mt-3 bg-body-tertiary border-0" style="display: none;">
+          <div class="card-body">
+            <div class="row align-items-center g-3">
+              <div class="col-md-8">
+                <h6 class="card-title mb-2">
+                  <i class="bi bi-person-circle"></i>
+                  <span id="cliente-nombre-display">Cliente</span>
+                </h6>
+                <div class="row">
+                  <div class="col-sm-6">
+                    <small class="text-muted">Documento:</small><br>
+                    <span id="cliente-documento" class="fw-bold">-</span>
+                  </div>
+                  <div class="col-sm-6" id="cliente-correo-container" style="display: none;">
+                    <small class="text-muted">Correo:</small><br>
+                    <span id="cliente-correo">-</span>
+                  </div>
+                </div>
+                <div class="row mt-1">
+                  <div class="col-sm-6" id="cliente-telefono-container" style="display: none;">
+                    <small class="text-muted">Teléfono:</small><br>
+                    <span id="cliente-telefono">-</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4 text-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-editar-cliente"
+                  style="display: none;">
+                  <i class="bi bi-pencil"></i> Editar cliente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloque 2: Artículo y diagnóstico (captura en modal) -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-dark text-white border-0 py-3">
+        <span class="fw-bold"><i class="bi bi-tools me-2"></i>Artículo y diagnóstico técnico</span>
+      </div>
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <p class="mb-0 small text-secondary">
+            Registra categoría, identificación, estado físico, batería y repuestos del artículo
+            en la ficha técnica antes de agregarlo al listado.
+          </p>
+          <button type="button" class="btn btn-success" id="btn-agregar-articulo" data-bs-toggle="modal"
+            data-bs-target="#modalArticulo">
+            <i class="bi bi-plus-circle me-1"></i> Agregar artículo
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloque 3: Artículos ingresados -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-dark text-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-bold"><i class="bi bi-box-seam me-2"></i>Artículos ingresados</span>
+        <span class="badge bg-success fs-6">Total: $<span id="articulos-total">0</span></span>
+      </div>
+      <div class="card-body p-4">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tabla-articulos">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Artículo</th>
+                <th>Marca</th>
+                <th>Referencia</th>
+                <th>Descripción</th>
+                <th>Sitio</th>
+                <th>Productos/Servicios</th>
+                <th class="text-end">Valor</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="articulos-lista"></tbody>
+          </table>
+        </div>
+        <input type="hidden" name="articulos_json" id="articulos-json">
+      </div>
+    </div>
+
+    <!-- Bloque 4: Anticipo y finalización -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-dark text-white border-0 py-3">
+        <span class="fw-bold"><i class="bi bi-cash-coin me-2"></i>Anticipo y finalización</span>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="small text-uppercase text-muted fw-semibold mb-1">Monto del anticipo</label>
+            <input type="number" name="anticipo_monto" class="form-control" min="0" step="0.01" placeholder="$0">
+          </div>
+          <div class="col-md-4">
+            <label class="small text-uppercase text-muted fw-semibold mb-1" for="anticipo_metodo">Método de pago</label>
+            <select name="anticipo_metodo" id="anticipo_metodo" class="form-select">
+              <option value="">Sin anticipo</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="small text-uppercase text-muted fw-semibold mb-1" for="numero_factura_siigo">Número factura
+              Siigo <span id="siigo-required" class="text-danger" style="display:none;">*</span></label>
+            <input type="text" name="numero_factura_siigo" id="numero_factura_siigo" class="form-control"
+              placeholder="Solo para tarjeta/transferencia">
+            <small class="text-muted">Requerido para tarjeta o transferencia</small>
+          </div>
+        </div>
+        <hr class="my-4">
+        <div class="d-flex flex-wrap justify-content-end gap-3">
+          <button type="button" class="btn btn-outline-secondary px-4"
+            onclick="cancelarCreacionOT()">Cancelar</button>
+          <button type="submit" class="btn btn-success btn-lg px-5">
+            <i class="bi bi-save me-1"></i> Guardar orden de trabajo
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Modal para agregar/editar artículo -->
+<div class="modal fade" id="modalArticulo" tabindex="-1" aria-labelledby="modalArticuloLabel" aria-hidden="true"
+  data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="form-articulo">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalArticuloLabel"><i class="bi bi-box-seam"></i> Agregar/Editar Artículo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="articulo_idx" id="articulo_idx">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Artículo</label>
+              <select name="tipo" id="articulo-tipo" class="form-select" required>
+                <option value="">Seleccionar...</option>
+                <option value="reloj">Reloj</option>
+                <option value="bateria">Batería</option>
+                <option value="ae">Artículo Electrónico</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Marca</label>
+              <input type="text" name="marca" class="form-control" required placeholder="Marca">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Referencia</label>
+              <input type="text" name="referencia" class="form-control" placeholder="Referencia">
+            </div>
+
+            <!-- Checklist detallado de características por tipo de artículo -->
+            <div id="check_list_reloj" style="display:none;">
+              <label class="form-label">Características del Reloj</label>
+              <div class="container-fluid">
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 justify-content-center">
+                  <!-- Caja -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Caja</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_rayada"
+                            value="Caja rayada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_rayada">Caja rayada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_quebrada"
+                            value="Caja quebrada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_quebrada">Caja quebrada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_manchada"
+                            value="Caja manchada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_manchada">Caja manchada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_porosa"
+                            value="Caja porosa" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_porosa">Caja porosa</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_sintornillo"
+                            value="Caja sin tornillo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_sintornillo">Caja sin
+                            tornillo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_caja_decolorada"
+                            value="Caja decolorada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_caja_decolorada">Caja
+                            decolorada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Cristal -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Cristal</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_rayado"
+                            value="Cristal rayado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_rayado">Cristal
+                            rayado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_quebrado"
+                            value="Cristal quebrado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_quebrado">Cristal
+                            quebrado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_despicado"
+                            value="Cristal despicado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_despicado">Cristal
+                            despicado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_manchado"
+                            value="Cristal manchado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_manchado">Cristal
+                            manchado</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_cristal_humedad"
+                            value="Cristal con humedad" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_cristal_humedad">Cristal con
+                            humedad</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Esfera -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Esfera</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_rayada"
+                            value="Esfera rayada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_rayada">Esfera rayada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_quebrada"
+                            value="Esfera quebrada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_quebrada">Esfera
+                            quebrada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_manchada"
+                            value="Esfera manchada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_manchada">Esfera
+                            manchada</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_esfera_decolorada"
+                            value="Esfera decolorada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_esfera_decolorada">Esfera
+                            decolorada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Manecillas -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Manecillas</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_dobles"
+                            value="Manecillas dobles" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_dobles">Manecillas
+                            dobles</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_rotas"
+                            value="Manecillas rotas" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_rotas">Manecillas
+                            rotas</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_faltantes"
+                            value="Manecillas faltantes" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_faltantes">Manecillas
+                            faltantes</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_manecillas_decoloradas"
+                            value="Manecillas decoloradas" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_manecillas_decoloradas">Manecillas
+                            decoloradas</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Movimiento -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Movimiento</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_automatico"
+                            value="Movimiento automático" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1"
+                            for="ch_movimiento_automatico">Automático</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_cuarto"
+                            value="Movimiento de cuarzo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_movimiento_cuarto">De cuarzo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_cronografo"
+                            value="Movimiento cronógrafo" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1"
+                            for="ch_movimiento_cronografo">Cronógrafo</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_movimiento_danado"
+                            value="Movimiento dañado" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_movimiento_danado">Movimiento
+                            dañado</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Correa/Pulsera -->
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Correa/Pulsera</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_cuero"
+                            value="Correa de cuero" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_cuero">Cuero</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_metal"
+                            value="Correa metálica" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_metal">Metálica</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_silicona"
+                            value="Correa de silicona" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_silicona">Silicona</label>
+
+                          <input class="btn-check" type="checkbox" name="caracteristicas" id="ch_correa_danada"
+                            value="Correa dañada" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="ch_correa_danada">Correa dañada</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Campos adicionales para relojes -->
+                <div class="row mt-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Número de eslabones</label>
+                    <input type="number" name="eslabones_numero" id="eslabones_numero" class="form-control" min="1"
+                      placeholder="Ej: 5">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Reloj:</label>
+                    <div class="d-flex flex-wrap">
+                      <input class="btn-check" type="radio" name="tapa_tipo" id="tapa_original" value="Original"
+                        autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm m-1" for="tapa_original">Original</label>
+
+                      <input class="btn-check" type="radio" name="tapa_tipo" id="tapa_imitacion" value="Imitación"
+                        autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm m-1" for="tapa_imitacion">Imitación</label>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Garantía</label>
+                    <div class="d-flex flex-wrap">
+                      <input class="btn-check" type="radio" name="garantia" id="garantia_si" value="Con garantía"
+                        autocomplete="off">
+                      <label class="btn btn-outline-success btn-sm m-1" for="garantia_si">Con garantía</label>
+
+                      <input class="btn-check" type="radio" name="garantia" id="garantia_no" value="Sin garantía"
+                        autocomplete="off">
+                      <label class="btn btn-outline-danger btn-sm m-1" for="garantia_no">Sin garantía</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Checklist para baterías -->
+            <div id="check_list_bateria" style="display:none;">
+              <label class="form-label">Características de la Batería</label>
+              <div class="container-fluid">
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 justify-content-center">
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Voltaje</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_voltaje" id="bateria_voltaje"
+                          class="form-control form-control-sm" placeholder="Ej. 3.7V">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Amperaje</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_amperaje" id="bateria_amperaje"
+                          class="form-control form-control-sm" placeholder="Ej. 2000 mAh">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Cantidad de celdas</div>
+                      <div class="card-body">
+                        <input type="text" name="bateria_celdas" id="bateria_celdas"
+                          class="form-control form-control-sm" placeholder="Ej. 1, 2, 3">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col">
+                    <div class="card h-100 shadow-sm">
+                      <div class="card-header small">Aplicación</div>
+                      <div class="card-body">
+                        <div class="d-flex flex-wrap">
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_industrial"
+                            value="industrial" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_industrial">Industrial</label>
+
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_biomedica"
+                            value="biomedica" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_biomedica">Biomédica</label>
+
+                          <input class="btn-check" type="radio" name="bateria_aplicacion" id="app_ae"
+                            value="articulo electronico" autocomplete="off">
+                          <label class="btn btn-outline-primary btn-sm m-1" for="app_ae">Artículo electrónico</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Placeholder para artículos electrónicos -->
+            <div id="check_list_ae" style="display:none;">
+              <label class="form-label">Características del Artículo Electrónico</label>
+              <div class="container-fluid">
+                <div class="row">
+                  <div class="col-md-12">
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle"></i> Especifique las características en la descripción del artículo.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Descripción <span class="text-danger">*</span></label>
+              <textarea name="descripcion" class="form-control" rows="2" placeholder="Descripción del artículo"
+                required></textarea>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Productos/Servicios</label>
+              <div class="border rounded p-3 bg-light">
+                <!-- Formulario para agregar productos -->
+                <!-- Formulario para agregar productos -->
+                <div class="row g-2 mb-3">
+                  <div class="col-md-2">
+                    <input type="text" class="form-control form-control-sm" id="producto-sku"
+                      placeholder="Buscar producto..." autocomplete="off">
+                    <div id="productos-sugerencias" class="position-absolute bg-white border rounded shadow-sm"
+                      style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto; width: calc(100% - 30px);">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" id="producto-nombre-custom"
+                      placeholder="Nombre personalizado (opcional)" autocomplete="off">
+                  </div>
+                  <div class="col-md-1">
+                    <input type="number" class="form-control form-control-sm" id="producto-cantidad" placeholder="Cant."
+                      min="1" value="1">
+                  </div>
+                  <div class="col-md-2">
+                    <input type="number" class="form-control form-control-sm" id="producto-descuento"
+                      placeholder="Desc. %" min="0" max="100" value="0" step="0.01">
+                  </div>
+                  <div class="col-md-2">
+                    <input type="text" class="form-control form-control-sm" id="producto-precio" placeholder="Precio $"
+                      inputmode="numeric">
+                  </div>
+                  <div class="col-md-2">
+                    <button type="button" class="btn btn-success btn-sm w-100" id="btn-agregar-al-carrito">
+                      <i class="bi bi-cart-plus"></i> Agregar
+                    </button>
+                  </div>
+                </div> <!-- Lista de productos agregados -->
+                <div id="productos-articulo-lista" class="mb-2">
+                  <!-- Aquí se mostrarán los productos agregados dinámicamente -->
+                  <div class="text-muted small">No hay productos agregados aún</div>
+                </div>
+                <div class="text-end">
+                  <strong>Subtotal: $<span id="productos-articulo-total">0</span></strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Valor Total del Artículo</label>
+              <input type="number" name="valor" id="valor-articulo" class="form-control" min="0" step="1"
+                placeholder="$" readonly>
+              <small class="form-text text-muted">Calculado automáticamente de los productos agregados</small>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Sitio de Reparación <span class="text-danger">*</span></label>
+              <select name="sitio_reparacion" id="articulo-sitio" class="form-select" required>
+                <option value="">Selecciona sitio de reparación...</option>
+                <!-- Las opciones se llenarán dinámicamente desde el backend -->
+              </select>
+              <small class="form-text text-muted">Selecciona donde se reparará este artículo</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-articulo"
+            data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar artículo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% include 'snippets/modalNuevoCliente.html' %}
+
+<!-- Modal para editar nombre de producto -->
+<div class="modal fade" id="modalEditarNombreProducto" tabindex="-1" aria-labelledby="modalEditarNombreProductoLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalEditarNombreProductoLabel">
+          <i class="bi bi-pencil-square"></i> Editar Nombre del Producto
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <label for="input-nombre-producto-edit" class="form-label">Nombre del Producto</label>
+        <input type="text" class="form-control" id="input-nombre-producto-edit" placeholder="Ingrese el nombre..."
+          style="text-transform: uppercase;">
+        <small class="text-muted">El texto se convertirá automáticamente a MAYÚSCULAS</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar-nombre-producto">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Cliente OT -->
+<div class="modal fade" id="modalEditarClienteOT" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">Editar Cliente - Orden de Trabajo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditarCliente">
+          <input type="hidden" name="id" id="editar-cliente-id">
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" name="nombre" id="editar-cliente-nombre" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tipo</label>
+            <select class="form-select" name="tipo" id="editar-cliente-tipo">
+              <option value="natural">Persona</option>
+              <option value="empresa">Empresa</option>
+            </select>
+          </div>
+          <div class="mb-3" id="editar-campo-identificacion">
+            <label class="form-label" id="editar-label-identificacion">Identificación</label>
+            <input class="form-control" name="identificacion" id="editar-cliente-identificacion">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo</label>
+            <input class="form-control" name="correo" id="editar-cliente-correo">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Teléfono</label>
+            <input class="form-control" name="telefono" id="editar-cliente-telefono">
+          </div>
+        </form>
+        <div id="editar-cliente-error" class="text-danger" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-guardar-cliente-edicion" class="btn btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Scripts del sistema de modulos -->
+<script src="{{ url_for('static', filename='js/shared/event-bus.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/modules/clients/clients-core.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}?v=20251120g"></script>
+<script src="{{ url_for('static', filename='js/orden_trabajo_carrito.js') }}?v=20251120k"></script>
+
+<script>
+  // Sitios de reparación disponibles (del backend)
+  window.sitiosReparacion = {{ sitios_reparacion | tojson }};
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Poblar el select de sitios de reparación en el modal
+    const sitioSelect = document.getElementById('articulo-sitio');
+    if (sitioSelect && window.sitiosReparacion) {
+      sitioSelect.innerHTML = '<option value="">Selecciona sitio de reparación...</option>';
+      window.sitiosReparacion.forEach(function (sitio) {
+        const option = document.createElement('option');
+        option.value = sitio[0]; // ID
+        option.textContent = sitio[1]; // Nombre
+        sitioSelect.appendChild(option);
+      });
+    }
+    // Limpiar datos de auto-guardado anteriores para evitar contaminación entre crear/editar
+    try {
+      localStorage.removeItem('ot_formulario_create_temp');
+      localStorage.removeItem('ot_formulario_edit_temp');
+    } catch (e) {
+      console.warn('No se pudo limpiar localStorage:', e);
+    }
+
+    // Idempotencia: token único por render para evitar OTs duplicadas
+    try {
+      var otKeyInput = document.getElementById('idempotency_key');
+      if (otKeyInput && !otKeyInput.value) {
+        var rand = '';
+        if (window.crypto && window.crypto.getRandomValues) {
+          var buf = new Uint32Array(4);
+          window.crypto.getRandomValues(buf);
+          for (var i = 0; i < buf.length; i++) rand += buf[i].toString(36);
+        } else {
+          rand = Math.random().toString(36).slice(2);
+        }
+        otKeyInput.value = 'ot-' + Date.now().toString(36) + '-' + rand.slice(0, 16);
+      }
+    } catch (e) {
+      console.warn('No se pudo generar idempotency_key:', e);
+    }
+
+    // --- Funcionalidad del modal de editar cliente ---
+
+    // Función para obtener el token CSRF
+    function getCsrfToken() {
+      // Buscar en inputs hidden del formulario
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      if (csrfInput) {
+        return csrfInput.value;
+      }
+      // Buscar en meta tags
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (csrfMeta) {
+        return csrfMeta.getAttribute('content');
+      }
+      return null;
+    }
+
+    // Usar event delegation para el botón editar cliente
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'btn-editar-cliente') {
+        console.log('Botón editar cliente clickeado (event delegation)');
+        e.preventDefault();
+        const id = document.getElementById('client-id').value;
+        console.log('Cliente ID:', id);
+        if (!id) {
+          alert('Seleccione primero un cliente para editar.');
+          return;
+        }
+
+        // Mostrar loading en el botón
+        e.target.innerHTML = '<i class="bi bi-hourglass-split"></i> Cargando...';
+        e.target.disabled = true;
+
+        const csrfToken = getCsrfToken();
+        const headers = {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        };
+        if (csrfToken) {
+          headers['X-CSRFToken'] = csrfToken;
+        }
+
+        fetch(`/clients/api/cliente/${id}`, {
+          headers: headers,
+          credentials: 'same-origin'
+        })
+          .then(res => res.json())
+          .then(data => {
+            console.log('Datos del cliente cargados:', data);
+
+            if (!data || !data.id) {
+              throw new Error('Datos del cliente no válidos');
+            }
+
+            const client = data;
+
+            // Llenar el formulario
+            document.getElementById('editar-cliente-id').value = client.id;
+            document.getElementById('editar-cliente-nombre').value = client.nombre || '';
+            document.getElementById('editar-cliente-tipo').value = client.cc ? 'natural' : 'empresa';
+            document.getElementById('editar-cliente-identificacion').value = client.cc || client.nit || '';
+            document.getElementById('editar-cliente-correo').value = client.correo || '';
+            document.getElementById('editar-cliente-telefono').value = client.telefono || '';
+
+            // Actualizar label según el tipo
+            const tipoSelect = document.getElementById('editar-cliente-tipo');
+            const lbl = document.getElementById('editar-label-identificacion');
+            if (tipoSelect.value === 'empresa') {
+              lbl.textContent = 'NIT';
+            } else {
+              lbl.textContent = 'Número de identificación';
+            }
+
+            console.log('Mostrando modal de edición');
+            // Mostrar modal
+            const modal = new bootstrap.Modal(document.getElementById('modalEditarClienteOT'));
+            modal.show();
+
+          })
+          .catch(error => {
+            console.error('Error al cargar datos del cliente:', error);
+            alert('Error al cargar datos del cliente: ' + error.message);
+          })
+          .finally(() => {
+            // Restaurar botón
+            e.target.innerHTML = '<i class="bi bi-pencil"></i> Editar cliente';
+            e.target.disabled = false;
+          });
+      }
+    });
+
+    // Configurar el tipo de identificación dinámicamente
+    document.getElementById('editar-cliente-tipo').addEventListener('change', function () {
+      const lbl = document.getElementById('editar-label-identificacion');
+      if (this.value === 'empresa') {
+        lbl.textContent = 'NIT';
+      } else {
+        lbl.textContent = 'Número de identificación';
+      }
+    });
+
+    // Guardar cambios del cliente
+    document.getElementById('btn-guardar-cliente-edicion').addEventListener('click', async function () {
+      const id = document.getElementById('editar-cliente-id').value;
+      const payload = {
+        nombre: document.getElementById('editar-cliente-nombre').value,
+        correo: document.getElementById('editar-cliente-correo').value,
+        telefono: document.getElementById('editar-cliente-telefono').value,
+        tipo: document.getElementById('editar-cliente-tipo').value,
+        cc: '',
+        nit: ''
+      };
+      const ident = document.getElementById('editar-cliente-identificacion').value || '';
+      if (payload.tipo === 'natural') payload.cc = ident; else payload.nit = ident;
+
+      const errDiv = document.getElementById('editar-cliente-error');
+      errDiv.style.display = 'none';
+
+      // Mostrar loading
+      this.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+      this.disabled = true;
+
+      try {
+        const csrfToken = getCsrfToken();
+        console.log('Token CSRF encontrado:', csrfToken ? 'Sí' : 'No', csrfToken);
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        };
+        if (csrfToken) {
+          headers['X-CSRFToken'] = csrfToken;
+        }
+        console.log('Headers enviados:', headers);
+
+        const res = await fetch(`/clients/api/cliente/${id}`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload),
+          credentials: 'same-origin'
+        });
+
+        console.log('Respuesta del servidor:', res.status, res.statusText);
+        console.log('Headers de respuesta:', Object.fromEntries(res.headers.entries()));
+
+        let data;
+        try {
+          data = await res.json();
+          console.log('Datos JSON:', data);
+        } catch (jsonError) {
+          console.error('Error al parsear JSON:', jsonError);
+          const textResponse = await res.text();
+          console.log('Respuesta como texto:', textResponse);
+          throw new Error('Respuesta no válida del servidor');
+        }
+
+        if (!res.ok || !data.success) {
+          console.log('Error detectado - res.ok:', res.ok, 'data.success:', data.success);
+          errDiv.textContent = (data && data.error) ? data.error : 'Error al actualizar cliente';
+          errDiv.style.display = '';
+          return;
+        }
+
+        // Actualizar la UI con los nuevos valores
+        const client = data.cliente || data;
+        console.log('Actualizando UI con cliente:', client);
+
+        // Actualizar elementos principales (siempre deberían existir)
+        const buscarCliente = document.getElementById('buscar-cliente');
+        const clienteId = document.getElementById('client-id');
+        const nombreDisplay = document.getElementById('cliente-nombre-display');
+        const documentoSpan = document.getElementById('cliente-documento');
+
+        if (buscarCliente) buscarCliente.value = client.nombre || '';
+        if (clienteId) clienteId.value = client.id || id;
+        if (nombreDisplay) nombreDisplay.textContent = client.nombre || '-';
+        if (documentoSpan) documentoSpan.textContent = client.cedula || '-';
+
+        // Actualizar correo
+        const correoSpan = document.getElementById('cliente-correo');
+        const correoContainer = document.getElementById('cliente-correo-container');
+        console.log('Elementos de correo:', { correoSpan: !!correoSpan, correoContainer: !!correoContainer });
+        if (correoSpan && correoContainer) {
+          if (client.correo) {
+            correoSpan.textContent = client.correo;
+            correoContainer.style.display = 'block';
+          } else {
+            correoContainer.style.display = 'none';
+          }
+        }
+
+        // Actualizar teléfono
+        const telefonoSpan = document.getElementById('cliente-telefono');
+        const telefonoContainer = document.getElementById('cliente-telefono-container');
+        console.log('Elementos de teléfono:', { telefonoSpan: !!telefonoSpan, telefonoContainer: !!telefonoContainer });
+        if (telefonoSpan && telefonoContainer) {
+          if (client.telefono) {
+            telefonoSpan.textContent = client.telefono;
+            telefonoContainer.style.display = 'block';
+          } else {
+            telefonoContainer.style.display = 'none';
+          }
+        }
+
+        // Actualizar campos ocultos
+        const cedulaInput = document.getElementById('cliente-cedula');
+        const telefonoHidden = document.getElementById('cliente-telefono-hidden');
+        console.log('Campos ocultos:', { cedulaInput: !!cedulaInput, telefonoHidden: !!telefonoHidden });
+        if (cedulaInput) cedulaInput.value = client.cedula || '';
+        if (telefonoHidden) telefonoHidden.value = client.telefono || '';
+
+        // Cerrar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarClienteOT'));
+        if (modal) modal.hide();
+
+        // Auto-guardar después de actualizar el cliente
+        if (typeof autoGuardarFormulario === 'function') {
+          setTimeout(autoGuardarFormulario, 100);
+        }
+
+        // Mostrar mensaje de éxito
+        alert('Cliente actualizado correctamente');
+
+      } catch (e) {
+        console.error('Error completo:', e);
+        errDiv.textContent = `Error de red al actualizar cliente: ${e.message}`;
+        errDiv.style.display = '';
+      } finally {
+        // Restaurar botón
+        this.innerHTML = 'Guardar';
+        this.disabled = false;
+      }
+    });
+
+    // Funcionalidad del checklist de características por tipo de artículo
+    const articuloTipoSelect = document.getElementById('articulo-tipo');
+    const clReloj = document.getElementById('check_list_reloj');
+    const clBat = document.getElementById('check_list_bateria');
+    const clAE = document.getElementById('check_list_ae');
+
+    function hideAllChecklists() {
+      if (clReloj) clReloj.style.display = 'none';
+      if (clBat) clBat.style.display = 'none';
+      if (clAE) clAE.style.display = 'none';
+    }
+
+    function showChecklistForTipo() {
+      hideAllChecklists();
+      if (!articuloTipoSelect) return;
+      const tipo = articuloTipoSelect.value;
+      if (tipo === 'reloj') {
+        if (clReloj) clReloj.style.display = 'block';
+      }
+      else if (tipo === 'bateria') {
+        if (clBat) clBat.style.display = 'block';
+      }
+      else if (tipo === 'ae') {
+        if (clAE) clAE.style.display = 'block';
+      }
+    }
+
+    if (articuloTipoSelect) {
+      articuloTipoSelect.addEventListener('change', showChecklistForTipo);
+      // Ejecutar al cargar por si el formulario se restaura
+      showChecklistForTipo();
+    }
+
+    // Validación de anticipo: si es tarjeta o transferencia, número factura Siigo es obligatorio
+    const anticipoMetodo = document.getElementById('anticipo_metodo');
+    const numeroFacturaSiigo = document.getElementById('numero_factura_siigo');
+    const siigoRequired = document.getElementById('siigo-required');
+    const anticipoMonto = document.querySelector('input[name="anticipo_monto"]');
+    const formCrearOT = document.getElementById('form-orden-trabajo');
+
+    // NUEVA VALIDACIÓN: Si hay monto de anticipo, el método de pago es obligatorio
+    if (anticipoMonto && anticipoMetodo) {
+      anticipoMonto.addEventListener('input', function () {
+        const monto = parseFloat(this.value) || 0;
+        if (monto > 0) {
+          // Hay monto, hacer método de pago obligatorio
+          anticipoMetodo.required = true;
+          anticipoMetodo.classList.add('border-danger');
+          anticipoMetodo.parentElement.classList.add('border-danger');
+        } else {
+          // No hay monto, método de pago es opcional
+          anticipoMetodo.required = false;
+          anticipoMetodo.classList.remove('border-danger');
+          anticipoMetodo.parentElement.classList.remove('border-danger');
+          // Si se borra el monto, también limpiar el método
+          anticipoMetodo.value = '';
+          numeroFacturaSiigo.required = false;
+          if (siigoRequired) siigoRequired.style.display = 'none';
+          numeroFacturaSiigo.classList.remove('border-primary');
+        }
+      });
+    }
+
+    if (anticipoMetodo && numeroFacturaSiigo) {
+      anticipoMetodo.addEventListener('change', function () {
+        const metodo = this.value;
+        if (metodo === 'tarjeta' || metodo === 'transferencia') {
+          numeroFacturaSiigo.required = true;
+          if (siigoRequired) siigoRequired.style.display = 'inline';
+          numeroFacturaSiigo.classList.add('border-primary');
+        } else {
+          numeroFacturaSiigo.required = false;
+          if (siigoRequired) siigoRequired.style.display = 'none';
+          numeroFacturaSiigo.classList.remove('border-primary');
+        }
+      });
+    }
+
+    // Validar antes de enviar el formulario
+    if (formCrearOT) {
+      formCrearOT.addEventListener('submit', function (e) {
+        const monto = parseFloat(anticipoMonto ? anticipoMonto.value : 0) || 0;
+        const metodo = anticipoMetodo ? anticipoMetodo.value : '';
+        const numeroFactura = numeroFacturaSiigo ? numeroFacturaSiigo.value.trim() : '';
+
+        // Validación: Si hay monto, debe haber método de pago
+        if (monto > 0 && !metodo) {
+          e.preventDefault();
+          alert('Si ingresa un monto de anticipo, debe seleccionar un método de pago.');
+          if (anticipoMetodo) {
+            anticipoMetodo.focus();
+            anticipoMetodo.classList.add('is-invalid');
+          }
+          return false;
+        }
+
+        if ((metodo === 'tarjeta' || metodo === 'transferencia') && !numeroFactura) {
+          e.preventDefault();
+          alert('El Número de Factura Siigo es obligatorio para pagos con tarjeta o transferencia.');
+          if (numeroFacturaSiigo) {
+            numeroFacturaSiigo.focus();
+            numeroFacturaSiigo.classList.add('is-invalid');
+          }
+          return false;
+        }
+
+        // Bloquear botón para prevenir doble envío
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+        }
+      });
+    }
+
+    // Función para cancelar la creación de OT y limpiar datos
+    window.cancelarCreacionOT = function () {
+      // Limpiar localStorage
+      try {
+        localStorage.removeItem('ot_formulario_create_temp');
+        localStorage.removeItem('ot_formulario_edit_temp');
+        localStorage.removeItem('orden_trabajo_temp');
+        console.log('LocalStorage limpiado al cancelar creación de OT');
+      } catch (e) {
+        console.warn('No se pudo limpiar localStorage:', e);
+      }
+
+      // Redirigir a la lista de órdenes
+      window.location.href = '{{ url_for("ordenes.listar_ordenes") }}';
+    };
+
+    // Interceptar el submit del formulario para limpiar localStorage cuando se guarde exitosamente
+    const formOrdenTrabajo = document.getElementById('form-orden-trabajo');
+    if (formOrdenTrabajo) {
+      formOrdenTrabajo.addEventListener('submit', function (e) {
+        // NO limpiar aquí - esperar a que la página redirija exitosamente
+        console.log('Formulario enviado, esperando confirmación de éxito...');
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h2 class="mb-4">Nuevo Cliente</h2>
+
+<!-- Mensajes flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<form method="POST" id="formNuevoClienteStandalone">
+  <script>
+    document.getElementById('formNuevoClienteStandalone').addEventListener('submit', function(e) {
+      e.stopPropagation(); // Prevent interference from global scripts
+    });
+  </script>
+
+  {{ form.hidden_tag() }}
+
+  <!-- Nombre -->
+  <div class="mb-3">
+    {{ form.nombre.label(class="form-label") }}
+    {{ form.nombre(class="form-control text-uppercase") }}
+    {% for error in form.nombre.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Tipo de cliente -->
+  <div class="mb-3">
+    {{ form.tipo.label(class="form-label") }}
+    {{ form.tipo(class="form-select") }}
+    {% for error in form.tipo.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Identificacion: CC -->
+  <div class="mb-3 d-none" id="grupo-cc">
+    {{ form.cc.label(class="form-label") }}
+    {{ form.cc(class="form-control", id="cc") }}
+    {% for error in form.cc.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Identificacion: NIT -->
+  <div class="mb-3 d-none" id="grupo-nit">
+    {{ form.nit.label(class="form-label") }}
+    {{ form.nit(class="form-control", id="nit") }}
+    {% for error in form.nit.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Correo -->
+  <div class="mb-3">
+    {{ form.correo.label(class="form-label") }}
+    {{ form.correo(class="form-control") }}
+    {% for error in form.correo.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Telefono -->
+  <div class="mb-3">
+    {{ form.telefono.label(class="form-label") }}
+    {{ form.telefono(class="form-control") }}
+    {% for error in form.telefono.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-success">Guardar</button>
+  <a href="{{ url_for('clients.listar') }}" class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+
+<!-- JS dinamico para mostrar campos segun tipo -->
+<script>
+  const tipo = document.getElementById("tipo");
+  const grupoCC = document.getElementById("grupo-cc");
+  const grupoNIT = document.getElementById("grupo-nit");
+
+  tipo.addEventListener("change", function () {
+    if (this.value === "natural") {
+      grupoCC.classList.remove("d-none");
+      grupoNIT.classList.add("d-none");
+    } else if (this.value === "empresa") {
+      grupoCC.classList.add("d-none");
+      grupoNIT.classList.remove("d-none");
+    } else {
+      grupoCC.classList.add("d-none");
+      grupoNIT.classList.add("d-none");
+    }
+  });
+
+  tipo.dispatchEvent(new Event("change")); // Forzar el evento al cargar la página para mostrar el campo correcto
+</script>
+
+{% endblock %}

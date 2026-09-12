@@ -1,0 +1,66 @@
+{# Snippet reutilizable: buscador_cliente_card #}
+<div class="card mb-4 border-dark">
+  <div class="card-header bg-dark text-white fw-bold">
+    <i class="bi bi-person-badge"></i> Datos del cliente
+  </div>
+  <div class="card-body">
+  <div class="row mb-3" id="datos-cliente">
+      <div class="col-md-8">
+        <div class="input-group">
+          <input type="text" id="buscar-cliente" class="form-control border-primary shadow-sm" placeholder="Buscar cliente por nombre o ID" autocomplete="off">
+          <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalNuevoCliente" title="Crear cliente">
+            <i class="bi bi-person-plus"></i> Nuevo Cliente
+          </button>
+        </div>
+        <input type="hidden" name="cliente_id" id="cliente-id">
+      </div>
+      <div class="col-md-4">
+        <p class="mb-1"><strong>Correo:</strong> <span id="cliente-correo">—</span></p>
+        <p class="mb-1"><strong>Telefono:</strong> <span id="cliente-telefono">—</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal Nuevo Cliente -->
+<div class="modal fade" id="modalNuevoCliente" tabindex="-1" aria-labelledby="modalNuevoClienteLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="formNuevoCliente" method="POST" action="/clients/crear_desde_modal">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title" id="modalNuevoClienteLabel"><i class="bi bi-person-plus"></i> Nuevo Cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Tipo de cliente</label>
+            <select name="tipo" id="tipo-cliente" class="form-select" required>
+              <option value="natural">Persona</option>
+              <option value="empresa">Empresa</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input type="text" name="nombre" class="form-control text-uppercase" required>
+          </div>
+          <div class="mb-3" id="campo-identificacion">
+            <label class="form-label" id="label-identificacion">Numero de identificacion</label>
+            <input type="text" name="cc" id="input-identificacion" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo</label>
+            <input type="email" name="correo" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Telefono</label>
+            <input type="text" name="telefono" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

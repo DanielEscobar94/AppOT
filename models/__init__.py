@@ -1,0 +1,1 @@
+# Archivo vacio. Todos los modelos estan en models/models.py

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+<!-- Template base especifico para modulo de ordenes -->
+{% block extra_css %}
+<style>
+/* Estilos especificos del modulo de ordenes para evitar conflictos */
+.orders-form-container {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.orders-product-name {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 6px 12px;
+    width: 100%;
+    background-color: #fff;
+}
+
+.orders-product-name:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.orders-cart-item {
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    background-color: #fff;
+    transition: all 0.2s ease;
+}
+
+.orders-cart-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.orders-btn-primary {
+    background-color: #4e73df;
+    border-color: #4e73df;
+    color: white;
+}
+
+.orders-btn-primary:hover {
+    background-color: #2e59d9;
+    border-color: #2653d4;
+}
+
+.orders-btn-danger {
+    background-color: #e74a3b;
+    border-color: #e74a3b;
+    color: white;
+}
+
+.orders-btn-danger:hover {
+    background-color: #c0392b;
+    border-color: #bd362f;
+}
+
+.orders-total-section {
+    background-color: #f8f9fc;
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.orders-alert {
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+}
+
+.orders-alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.orders-alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+/* Animaciones para mejor UX */
+.orders-fade-in {
+    animation: orders-fadeIn 0.3s ease-in;
+}
+
+@keyframes orders-fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive design para ordenes */
+@media (max-width: 768px) {
+    .orders-form-container {
+        padding: 10px;
+    }
+    
+    .orders-cart-item {
+        margin-bottom: 10px;
+    }
+}
+
+/* Indicadores de estado del modulo */
+.orders-module-indicator {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background-color: #28a745;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    z-index: 1000;
+    display: none;
+}
+
+.orders-module-indicator.active {
+    display: block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- El contenido especifico de cada pagina de ordenes se insertara aqui -->
+{{ super() }}
+{% endblock %}
+
+{% block extra_js %}
+<!-- Scripts especificos del modulo de ordenes -->
+<script>
+// Marcar la pagina como parte del modulo de ordenes
+document.body.classList.add('orders-module');
+
+// Configurar indicador del modulo (opcional, para debug)
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const indicator = document.createElement('div');
+    indicator.className = 'orders-module-indicator';
+    indicator.textContent = 'Orders Module';
+    document.body.appendChild(indicator);
+    
+    // Mostrar indicador cuando el modulo este activo
+    window.addEventListener('load', function() {
+        if (window.OrdersModule && window.OrdersModule.isInitialized()) {
+            indicator.classList.add('active');
+        }
+    });
+}
+</script>
+
+<!-- Cargar el core del modulo de ordenes -->
+<script src="{{ url_for('static', filename='js/modules/orders/orders-core.js') }}"></script>
+{% endblock %}

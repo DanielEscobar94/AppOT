@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>AppOT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Token CSRF para peticiones AJAX (header X-CSRFToken) -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logos_appot/favicon.svg') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logos_appot/logo_favicon.png') }}">
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <!-- Flatpickr CSS for date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+
+    <!-- Estilos personalizados o icono de AppOS -->
+    <style>
+    :root {
+        --app-sidebar-w: 250px;      /* ancho de la sidebar en escritorio */
+        --app-sidebar-w-min: 64px;   /* ancho de la sidebar colapsada */
+    }
+    body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    /* Acabado SaaS global para tarjetas con variables nativas Bootstrap 5.3 */
+    .card {
+        --bs-card-border-color: rgba(0, 0, 0, 0.05);
+        --bs-card-border-radius: 0.75rem;
+        --bs-card-box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    /* Loading spinner */
+    .app-spinner {
+        display: inline-block;
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--bs-primary);
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: app-spin 0.6s linear infinite;
+    }
+    .app-spinner-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 1.5px;
+    }
+    @keyframes app-spin {
+        to { transform: rotate(360deg); }
+    }
+    /* Skeleton loading */
+    .app-skeleton {
+        background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+        background-size: 200% 100%;
+        animation: app-shimmer 1.5s infinite;
+        border-radius: 4px;
+    }
+    @keyframes app-shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    /* Estilos minimos para el buscador de clientes usando Bootstrap */
+    .clients-suggestions-container {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        display: none;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .clients-suggestion-item {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    /* ==========================================================
+       LAYOUT SAAS — sidebar + topbar + contenido
+       * <1200px : sidebar como Offcanvas nativo de Bootstrap
+       * >=1200px: sidebar fija (sticky en flujo, 250px — 64px colapsada)
+       * Estado colapsado persistido en localStorage (sidebar.js)
+       * Colores y espaciados via utilidades/variables nativas Bootstrap 5.3
+       ========================================================== */
+    .app-sidebar {
+      --bs-offcanvas-width: 300px;
+      width: 300px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .app-main {
+      flex: 1;
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* El nav es lo unico que scrollea dentro de la sidebar (header y
+       usuario siempre visibles). min-height:0 permite que encoja en flex. */
+    .app-sidebar .app-sidebar-nav {
+      min-height: 0;
+    }
+    /* .app-content es la unica zona con scroll vertical de la app */
+    .app-content {
+      min-height: 0;
+    }
+    /* Marca de la sidebar: solo logo + nombre (las acciones viven en el topbar) */
+    .sidebar-brand {
+      min-width: 0;
+    }
+    .sidebar-brand img {
+      width: 36px;
+      height: 36px;
+      object-fit: cover;
+      flex: 0 0 auto;
+    }
+
+    /* Panel de notificaciones del topbar (toggle propio; evita cortes de dropdown).
+       Tema claro con variables nativas Bootstrap 5.3. */
+    .app-notif-panel {
+      position: absolute;
+      top: calc(100% + 0.5rem);
+      right: 0;
+      z-index: 1050;
+      display: none;
+      min-width: 300px;
+      max-width: min(92vw, 340px);
+      background: var(--bs-body-bg);
+      border: 1px solid var(--bs-border-color);
+      border-radius: 0.75rem;
+      box-shadow: var(--bs-box-shadow-lg);
+    }
+    .app-notif-panel.show { display: block; }
+    .app-notif-panel .notif-list {
+      max-height: 320px;
+      overflow: auto;
+    }
+    .app-notif-panel .notif-item {
+      color: var(--bs-body-color);
+      border-radius: 0.35rem;
+      white-space: normal;
+    }
+    .app-notif-panel .notif-item:hover {
+      background: var(--bs-tertiary-bg);
+    }
+
+    /* Dropdown de sugerencias del motor AppOTSearch: anclado al input,
+       sin desbordes laterales. El padre debe ser position:relative
+       (el motor lo garantiza si es static). */
+    .appot-search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      width: 100%;
+      z-index: 1050;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 2px;
+      background: var(--bs-body-bg);
+      border-radius: 0.5rem;
+    }
+    /* Navegacion de la sidebar sobre nav-pills nativo de Bootstrap */
+    .app-sidebar .nav-link {
+      color: rgba(255, 255, 255, 0.75);
+      border-radius: 0.5rem;
+      white-space: nowrap;
+      transition: all 0.25s ease-in-out;
+    }
+    .app-sidebar .nav-link:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .app-sidebar .nav-link.active {
+      color: #fff;
+      background: var(--bs-primary);
+      font-weight: 600;
+    }
+    .app-sidebar .nav-link > i.bi:first-child {
+      font-size: 1.05rem;
+      flex-shrink: 0;
+    }
+    .app-sidebar .app-nav-chevron {
+      font-size: 0.7rem;
+      transition: transform 0.25s ease-in-out;
+    }
+    .app-nav-group:has(.collapse.show) .app-nav-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Rejilla global: viewport fijo sin scroll general.
+       Solo .app-content despliega scroll vertical. */
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    /* ===== Desktop (>=1200px): sidebar sticky en flujo — imposible traslapar ===== */
+    @media (min-width: 1200px) {
+      .app-sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        width: var(--app-sidebar-w);
+        transform: none !important;
+        visibility: visible !important;
+        z-index: 1020;
+        transition: width 0.25s ease-in-out;
+      }
+    }
+
+    /* ===== Movil/tablet (<1200px): sidebar como drawer Offcanvas nativo ===== */
+    @media (max-width: 1199.98px) {
+      .app-main { width: 100%; }
+    }
+
+    /* ===== Estado colapsado (persistido, solo desktop): solo iconos ===== */
+    @media (min-width: 1200px) {
+      html.app-sidebar-collapsed .app-sidebar { width: var(--app-sidebar-w-min); }
+      html.app-sidebar-collapsed .app-sidebar .app-brand-text,
+      html.app-sidebar-collapsed .app-sidebar .sidebar-section,
+      html.app-sidebar-collapsed .app-sidebar .app-nav-label,
+      html.app-sidebar-collapsed .app-sidebar .app-nav-chevron,
+      html.app-sidebar-collapsed .app-sidebar .sidebar-user-info,
+      html.app-sidebar-collapsed .app-sidebar .app-nav-submenu { display: none !important; }
+      html.app-sidebar-collapsed .app-sidebar .nav-link { justify-content: center; }
+      html.app-sidebar-collapsed .app-sidebar .sidebar-brand { justify-content: center; }
+      html.app-sidebar-collapsed .app-sidebar .app-nav-group .nav-link[data-bs-toggle] { pointer-events: none; }
+      html.app-sidebar-collapsed .app-sidebar .sidebar-user-card {
+        flex-direction: column;
+        justify-content: center;
+      }
+    }
+    </style>
+
+    <!-- Sidebar: aplicar estado persistido ANTES del render (evita parpadeos / FOUC) -->
+    <script>
+    (function(){
+        try {
+            if (window.localStorage && localStorage.getItem('appot.sidebar') === 'collapsed') {
+                document.documentElement.classList.add('app-sidebar-collapsed');
+            }
+        } catch (e) { /* localStorage no disponible: estado expandido por defecto */ }
+    })();
+    </script>
+   
+</head>
+<body class="d-flex min-vh-100 {% block body_class %}{% endblock %}">
+
+    <!-- ===== Layout SaaS de dos columnas: sidebar + contenido principal ===== -->
+
+    <!-- ===== Columna 1: sidebar izquierda =====
+         - <1200px : Offcanvas nativo de Bootstrap (drawer lateral)
+         - >=1200px: sticky en flujo, 250px (64px colapsada)
+         - Colapso persistido en localStorage por static/js/sidebar.js -->
+    <aside class="offcanvas offcanvas-start app-sidebar bg-dark text-white" id="sidebarOffcanvas"
+           tabindex="-1" aria-labelledby="appSidebarLabel">
+
+        <!-- Header de la sidebar: solo marca/logo (las acciones viven en el topbar) -->
+        <div class="d-flex align-items-center gap-2 p-3 border-bottom border-white border-opacity-10">
+            <a id="appSidebarLabel" class="sidebar-brand d-flex align-items-center gap-2 flex-grow-1 text-decoration-none text-white fw-bold fs-6" href="{{ url_for('dashboard.index') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="AppOT" class="rounded-circle border border-white border-opacity-25">
+                <span class="app-brand-text text-truncate">AppOT</span>
+            </a>
+
+            <button type="button" class="btn-close btn-close-white d-xl-none flex-shrink-0" data-bs-dismiss="offcanvas" aria-label="Cerrar menú"></button>
+        </div>
+
+        <!-- Navegación con nav-pills nativo de Bootstrap -->
+        <nav class="nav nav-pills flex-column gap-1 p-3 app-sidebar-nav flex-grow-1 overflow-y-auto" aria-label="Navegación principal">
+            <div class="sidebar-section px-2 pt-1 pb-1 small text-uppercase fw-semibold text-white-50">Menú</div>
+
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint == 'dashboard.index' %} active{% endif %}" href="{{ url_for('dashboard.index') }}">
+                <i class="bi bi-speedometer2"></i><span class="app-nav-label">Dashboard</span>
+            </a>
+
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('clients.') %} active{% endif %}" href="{{ url_for('clients.listar') }}">
+                <i class="bi bi-people"></i><span class="app-nav-label">Clientes</span>
+            </a>
+
+            {% if current_user.is_authenticated and current_user.rol not in ['vendedor', 'tecnico'] %}
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('products.') %} active{% endif %}" href="{{ url_for('products.listar') }}">
+                <i class="bi bi-box-seam"></i><span class="app-nav-label">Productos</span>
+            </a>
+            {% endif %}
+
+            {% if current_user.is_authenticated and current_user.rol != 'tecnico' %}
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('sales.') %} active{% endif %}" href="{{ url_for('sales.nueva') }}">
+                <i class="bi bi-cart3"></i><span class="app-nav-label">Ventas / POS</span>
+            </a>
+            {% endif %}
+
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('ordenes.') %} active{% endif %}" href="{{ url_for('ordenes.listar_ordenes') }}">
+                <i class="bi bi-clipboard-check"></i><span class="app-nav-label">Órdenes de Trabajo</span>
+            </a>
+
+            {% if current_user.is_authenticated and current_user.rol in ['admin', 'supervisor'] %}
+            <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('salidas.') %} active{% endif %}" href="{{ url_for('salidas.listar') }}">
+                <i class="bi bi-truck"></i><span class="app-nav-label">Salidas de Productos</span>
+            </a>
+            {% endif %}
+
+            <!-- Grupo Reportes -->
+            <div class="app-nav-group">
+                <button type="button" class="nav-link d-flex align-items-center gap-2 w-100 text-start bg-transparent border-0{% if request.endpoint.startswith('reportes.') or request.endpoint.startswith('traslados.') %} active{% endif %}"
+                        data-bs-toggle="collapse" data-bs-target="#collapseReportes"
+                        aria-expanded="{% if request.endpoint.startswith('reportes.') or request.endpoint.startswith('traslados.') %}true{% else %}false{% endif %}"
+                        aria-controls="collapseReportes">
+                    <i class="bi bi-graph-up-arrow"></i><span class="app-nav-label">Reportes</span>
+                    <i class="bi bi-chevron-down ms-auto app-nav-chevron"></i>
+                </button>
+                <div class="collapse app-nav-submenu mt-1{% if request.endpoint.startswith('reportes.') or request.endpoint.startswith('traslados.') %} show{% endif %}" id="collapseReportes">
+                    <nav class="nav nav-pills flex-column gap-1 ms-3 ps-2 border-start border-white border-opacity-10" aria-label="Submenú Reportes">
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint == 'reportes.ventas' %} active{% endif %}" href="{{ url_for('reportes.ventas') }}">
+                        <i class="bi bi-graph-up"></i><span class="app-nav-label">Ventas</span>
+                    </a>
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint == 'reportes.anticipos' %} active{% endif %}" href="{{ url_for('reportes.anticipos') }}">
+                        <i class="bi bi-cash-stack"></i><span class="app-nav-label">Anticipo</span>
+                    </a>
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint == 'reportes.reparaciones' %} active{% endif %}" href="{{ url_for('reportes.reparaciones') }}">
+                        <i class="bi bi-tools"></i><span class="app-nav-label">Reparaciones</span>
+                    </a>
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('traslados.') %} active{% endif %}" href="{{ url_for('traslados.listar') }}">
+                        <i class="bi bi-arrow-left-right"></i><span class="app-nav-label">Traslados</span>
+                    </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Grupo Administración (solo admin) -->
+            {% if current_user.is_authenticated and current_user.rol == 'admin' %}
+            <div class="app-nav-group">
+                <button type="button" class="nav-link d-flex align-items-center gap-2 w-100 text-start bg-transparent border-0{% if request.endpoint.startswith('permissions.') or request.endpoint.startswith('users.') or request.endpoint.startswith('branches.') %} active{% endif %}"
+                        data-bs-toggle="collapse" data-bs-target="#collapseAdmin"
+                        aria-expanded="{% if request.endpoint.startswith('permissions.') or request.endpoint.startswith('users.') or request.endpoint.startswith('branches.') %}true{% else %}false{% endif %}"
+                        aria-controls="collapseAdmin">
+                    <i class="bi bi-gear"></i><span class="app-nav-label">Administración</span>
+                    <i class="bi bi-chevron-down ms-auto app-nav-chevron"></i>
+                </button>
+                <div class="collapse app-nav-submenu mt-1{% if request.endpoint.startswith('permissions.') or request.endpoint.startswith('users.') or request.endpoint.startswith('branches.') %} show{% endif %}" id="collapseAdmin">
+                    <nav class="nav nav-pills flex-column gap-1 ms-3 ps-2 border-start border-white border-opacity-10" aria-label="Submenú Administración">
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('permissions.') %} active{% endif %}" href="{{ url_for('permissions.index') }}">
+                        <i class="bi bi-shield-lock"></i><span class="app-nav-label">Permisos</span>
+                    </a>
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('users.') %} active{% endif %}" href="{{ url_for('users.listar') }}">
+                        <i class="bi bi-person-vcard"></i><span class="app-nav-label">Usuarios</span>
+                    </a>
+                    <a class="nav-link d-flex align-items-center gap-2{% if request.endpoint.startswith('branches.') %} active{% endif %}" href="{{ url_for('branches.listar') }}">
+                        <i class="bi bi-shop"></i><span class="app-nav-label">Sucursales</span>
+                    </a>
+                    </nav>
+                </div>
+            </div>
+            {% endif %}
+
+            <a class="nav-link d-flex align-items-center gap-2" href="https://cuadres.servipilas.net" target="_blank" rel="noopener">
+                <i class="bi bi-cash-coin"></i><span class="app-nav-label">Cuadre de caja</span>
+            </a>
+        </nav>
+
+        <!-- Pie de la sidebar: chip del usuario logueado (mt-auto lo ancla abajo) -->
+        {% if current_user.is_authenticated %}
+        <div class="mt-auto p-3 border-top border-white border-opacity-10">
+            <div class="sidebar-user-card d-flex align-items-center gap-2">
+                <span class="rounded-circle bg-white bg-opacity-10 text-white d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width:34px;height:34px;font-size:0.85rem;">{{ (current_user.email or current_user.username or '?')[:1]|upper }}</span>
+                <div class="sidebar-user-info flex-grow-1" style="min-width:0;">
+                    <span class="d-block text-truncate small fw-semibold text-white">{{ current_user.email or current_user.username }}</span>
+                    <span class="d-block small text-white-50">{{ current_user.rol }}</span>
+                </div>
+                <a class="btn btn-sm btn-outline-danger border-0 flex-shrink-0" href="{{ url_for('users.logout') }}" title="Cerrar sesión" aria-label="Cerrar sesión">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </aside>
+
+    <!-- ===== Columna 2: contenido principal (topbar + vistas + pie) ===== -->
+    <main id="main-content" class="app-main d-flex flex-column flex-grow-1 vh-100 bg-body-tertiary overflow-hidden">
+
+        <!-- Topbar superior (fija: fuera de la zona de scroll) -->
+        <header class="app-topbar navbar sticky-top bg-body border-bottom px-3 px-md-4 py-2 d-flex justify-content-between align-items-center fs-6 flex-shrink-0">
+            <div class="d-flex align-items-center gap-2" style="min-width:0;">
+                <button type="button" id="sidebarToggle" class="btn btn-light border-0 flex-shrink-0"
+                        aria-label="Abrir o colapsar menú" aria-expanded="true" title="Menú">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h1 class="h5 mb-0 fw-semibold text-secondary text-truncate">{% block page_title %}{% set _ns = (request.endpoint or '').split('.')[0] %}{{ {'dashboard': 'Dashboard', 'clients': 'Clientes', 'products': 'Productos', 'sales': 'Ventas / POS', 'ordenes': 'Órdenes de Trabajo', 'salidas': 'Salidas de Productos', 'reportes': 'Reportes', 'traslados': 'Traslados', 'permissions': 'Permisos', 'users': 'Usuarios', 'branches': 'Sucursales', 'caja': 'Caja', 'anticipos': 'Anticipos'}.get(_ns, 'Panel principal') }}{% endblock %}</h1>
+            </div>
+
+            {% if current_user.is_authenticated %}
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                {% if current_user.rol in ['supervisor', 'admin'] %}
+                <a class="btn btn-light border position-relative" href="{{ url_for('sales.gestionar_solicitudes') }}" title="Solicitudes de eliminación" aria-label="Solicitudes de eliminación">
+                    <i class="bi bi-trash"></i>
+                    {% if _solicitudes_eliminacion_pendientes and _solicitudes_eliminacion_pendientes > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ _solicitudes_eliminacion_pendientes }}</span>
+                    {% endif %}
+                </a>
+                {% endif %}
+                <div class="position-relative">
+                    <button type="button" id="notifDropdown" class="btn btn-light border position-relative"
+                            aria-label="Notificaciones" aria-expanded="false">
+                        <i class="bi bi-bell"></i>
+                        {% if _unread_notifications_count and _unread_notifications_count > 0 %}
+                            <span id="notif-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ _unread_notifications_count }}</span>
+                        {% else %}
+                            <span id="notif-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                        {% endif %}
+                    </button>
+                    <div class="app-notif-panel" id="notifPanel" aria-label="Notificaciones">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                            <strong class="small">Notificaciones</strong>
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none" id="mark-all-notifs">Limpiar todas</button>
+                        </div>
+                        <div class="notif-list px-2 py-1" id="notif-list">
+                            <ul class="list-unstyled mb-0">
+                            {% for n in _unread_notifications %}
+                                <li>
+                                    <a href="{{ n.link or '#' }}" class="dropdown-item notif-item px-2" data-id="{{ n.id }}">{{ n.message }}<br>
+                                        <small class="text-secondary">{{ n.created_at|local_datetime('%d/%m %H:%M') if n.created_at else '—' }}</small>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="px-3 py-2 text-secondary small">No hay notificaciones</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-light border d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Perfil de usuario">
+                        <span class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width:32px;height:32px;font-size:0.85rem;">{{ (current_user.email or current_user.username or '?')[:1]|upper }}</span>
+                        <span class="d-none d-md-inline small fw-semibold">{{ current_user.email or current_user.username }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><h6 class="dropdown-header">{{ current_user.email or current_user.username }}<br><small class="text-secondary">{{ current_user.rol }}</small></h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{{ url_for('users.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</a></li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </header>
+
+        <!-- Canvas de contenido fluido: unica zona con scroll vertical -->
+        <div class="container-fluid p-4 app-content flex-grow-1 overflow-y-auto">
+            <!-- Toast container -->
+            <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3 mt-5"></div>
+            <!-- Alertas dinamicas -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% set _success_msgs = [] %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                        </div>
+                        {% if category == 'success' %}
+                            {% set _success_msgs = _success_msgs + [message] %}
+                        {% endif %}
+                    {% endfor %}
+                    {# Hidden container to pass success messages to JS for toast display #}
+                    <div id="flash-success-messages" data-messages='{{ _success_msgs|tojson }}' style="display:none;"></div>
+                    {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+
+        <!-- Pie dentro de la columna de contenido: hereda su ancho automáticamente -->
+        <footer class="bg-body border-top py-2 text-center flex-shrink-0">
+            <div class="container-fluid">
+                <p class="mb-0 small text-secondary">
+                    Desarrollado por: John J. Arcila para Servipilas - Todos los Derechos Reservados <i class="bi bi-c-circle"></i>
+                </p>
+            </div>
+        </footer>
+
+    </main>
+
+    {% block styles %}{% endblock %}
+    {% block scripts %}{% endblock %}
+
+        <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Cleave.js for number formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+    <!-- Flatpickr JS for date picker -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/number-format.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/datepicker-init.js') }}"></script>
+    <!-- Sidebar: toggle colapsar/expandir + persistencia (carga diferida) -->
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}" defer></script>
+        <script>
+        // Notifications behavior
+        document.addEventListener('DOMContentLoaded', function(){
+            try {
+                const markAllBtn = document.getElementById('mark-all-notifs');
+                const notifList = document.getElementById('notif-list');
+                const notifCount = document.getElementById('notif-count');
+
+                function bindItems(){
+                    document.querySelectorAll('.notif-item').forEach(function(el){
+                        el.removeEventListener('click', onNotifClick);
+                        el.addEventListener('click', onNotifClick);
+                    });
+                }
+
+                function onNotifClick(e){
+                    // allow link navigation but mark read in background
+                    const id = this.getAttribute('data-id');
+                    fetch('/users/notifications/mark_read/' + id, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}})
+                    .then(r=>r.json()).then(()=>{ refreshCount(-1); });
+                }
+
+                function refreshCount(delta){
+                    try{
+                        if (!notifCount) return;
+                        let v = parseInt(notifCount.innerText||'0') + (delta||0);
+                        if (v <= 0){ notifCount.style.display='none'; notifCount.innerText = '0'; }
+                        else { notifCount.style.display='inline-block'; notifCount.innerText = ''+v; }
+                    }catch(e){}
+                }
+
+                markAllBtn?.addEventListener('click', function(e){
+                    e.preventDefault();
+                    fetch('{{ url_for("users.notifications_mark_all") }}', {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}})
+                        .then(r=>r.json()).then(()=>{ if(notifCount){ notifCount.style.display='none'; notifCount.innerText='0'; } notifList.innerHTML='<li class="px-3 text-muted">No hay notificaciones</li>'; });
+                });
+
+                // polling to refresh notifications every 15s
+                function fetchNotifs(){
+                    fetch('{{ url_for("users.notifications") }}')
+                        .then(r=>r.json()).then(data=>{
+                            if(!Array.isArray(data)) return;
+                            if(data.length===0){ notifList.innerHTML='<li class="px-3 text-muted">No hay notificaciones</li>'; notifCount.style.display='none'; notifCount.innerText='0'; return; }
+                            notifList.innerHTML = '';
+                            data.forEach(function(n){
+                                const li = document.createElement('li');
+                                const a = document.createElement('a');
+                                a.href = n.link || '#';
+                                a.className = 'dropdown-item notif-item';
+                                a.setAttribute('data-id', n.id);
+                                a.innerHTML = (n.message || '') + '<br><small class="text-muted">' + (new Date(n.created_at)).toLocaleString() + '</small>';
+                                li.appendChild(a);
+                                notifList.appendChild(li);
+                            });
+                            notifCount.style.display = (data.length>0)?'inline-block':'none';
+                            notifCount.innerText = ''+data.length;
+                            bindItems();
+                        }).catch(()=>{});
+                }
+
+                // initial bind
+                bindItems();
+                // if user is authenticated, start polling
+                setInterval(fetchNotifs, 15000);
+            } catch(e){}
+        });
+        
+            // Helper sencillo para mostrar toasts desde cualquier script
+            window.showToast = function(message, type){
+                try {
+                    var container = document.getElementById('toast-container');
+                    if (!container) return alert(message);
+                    var toastEl = document.createElement('div');
+                    toastEl.className = 'toast align-items-center text-bg-' + (type || 'success') + ' border-0';
+                    toastEl.setAttribute('role', 'alert');
+                    toastEl.setAttribute('aria-live', 'assertive');
+                    toastEl.setAttribute('aria-atomic', 'true');
+                    toastEl.innerHTML = '<div class="d-flex">'
+                        + '<div class="toast-body">' + (message || '') + '</div>'
+                        + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>'
+                        + '</div>';
+                    container.appendChild(toastEl);
+                    var toast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 3000 });
+                    toast.show();
+                    toastEl.addEventListener('hidden.bs.toast', function(){ toastEl.remove(); });
+                } catch (e) { alert(message); }
+            }
+            // On load, show any flashed success messages as toasts
+            document.addEventListener('DOMContentLoaded', function(){
+                try{
+                    var container = document.getElementById('flash-success-messages');
+                    if(container && container.dataset && container.dataset.messages){
+                        var msgs = JSON.parse(container.dataset.messages || '[]');
+                        if(Array.isArray(msgs)){
+                            msgs.forEach(function(m){ window.showToast(m, 'success'); });
+                        }
+                    }
+                }catch(e){}
+            });
+        </script>
+        <script>
+            (function(){
+                try {
+                    if (window.location.pathname && /\/ordenes\/ver\//.test(window.location.pathname)) {
+                        localStorage.removeItem('ot_form');
+                        localStorage.removeItem('ot_cart');
+                    }
+                } catch (e) { /* noop */ }
+            })();
+        </script>
+                <!-- Login modal (Bootstrap) -->
+                <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="loginModalLabel">Iniciar sesion</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="loginModalForm">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="mb-3">
+                                        <label for="modal-username" class="form-label">Usuario</label>
+                                        <input type="text" class="form-control" id="modal-username" name="username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="modal-password" class="form-label">Contrasena</label>
+                                        <input type="password" class="form-control" id="modal-password" name="password" required>
+                                    </div>
+                                    <div id="loginModalAlert" style="display:none;"></div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                <button type="button" id="loginModalSubmit" class="btn btn-primary">Entrar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function(){
+                        var loginModalEl = document.getElementById('loginModal');
+                        var loginModal = loginModalEl ? new bootstrap.Modal(loginModalEl, {backdrop: 'static', keyboard: false}) : null;
+                        var alertEl = document.getElementById('loginModalAlert');
+
+                        // Expose a function to show the modal (used by auth interceptor)
+                        window.auth_show_login_modal = function(){
+                                if (!loginModal) return;
+                                // clear fields
+                                try{ document.getElementById('modal-username').value=''; document.getElementById('modal-password').value=''; }catch(e){}
+                                if (alertEl) { alertEl.style.display='none'; alertEl.innerHTML=''; }
+                                loginModal.show();
+                        }
+
+                        async function submitLogin(){
+                                var u = document.getElementById('modal-username').value || '';
+                                var p = document.getElementById('modal-password').value || '';
+                                try{
+                                        var formData = new URLSearchParams();
+                                        formData.append('username', u);
+                                        formData.append('password', p);
+                                        var resp = await authFetch('{{ url_for("users.login") }}', {method: 'POST', body: formData});
+                                        // If response is a redirect (302) fetch won't follow to render; but Flask returns 302 for successful login.
+                                        if (resp.status === 200 || resp.status === 302 || resp.redirected){
+                                                // successful login - reload page to update UI / redirection
+                                                window.location.reload();
+                                                return;
+                                        }
+                                        // Otherwise try parse JSON for errors
+                                        var j = null;
+                                        try{ j = await resp.json(); }catch(e){}
+                                        var msg = (j && j.message) ? j.message : 'Usuario o contrasena incorrectos';
+                                        if (alertEl){ alertEl.style.display='block'; alertEl.innerHTML = '<div class="alert alert-danger">'+msg+'</div>'; }
+                                }catch(e){ if (alertEl){ alertEl.style.display='block'; alertEl.innerHTML = '<div class="alert alert-danger">Error de conexion</div>'; } }
+                        }
+
+                        document.getElementById('loginModalSubmit').addEventListener('click', function(e){ e.preventDefault(); submitLogin(); });
+
+                        // Hook the interceptor defaults to show modal on 401
+                        window.__auth_on_unauthorized = function(res, json){
+                                // show modal instead of redirect
+                                window.auth_show_login_modal();
+                        }
+                })();
+                </script>
+</body>
+</html>

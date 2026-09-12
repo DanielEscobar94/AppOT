@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="sales-module">
+    {% block sales_content %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block body_class %}sales-active{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Event Bus y modulos necesarios para ventas -->
+<script src="{{ url_for('static', filename='js/shared/event-bus.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modules/clients/clients-core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modules/sales/sales-core.js') }}"></script>
+{% block sales_scripts %}{% endblock %}
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<!-- Estilos especificos de ventas -->
+<style>
+/* Prefijo sales-module evita conflictos con otros modulos */
+.sales-module .client-search {
+    position: relative;
+}
+
+.sales-module .product-cart {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* Sobrescribir estilos de clientes para ventas */
+.sales-module .clients-suggestions-container {
+    z-index: 1050;
+}
+
+/* Layout para pagina POS */
+body.sales-active {
+    height: 100vh;
+}
+body.sales-active .app-content {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1;
+}
+body.sales-active .app-content > .sales-module {
+    flex: 1;
+    min-height: 0;
+}
+body.sales-active footer {
+    flex-shrink: 0;
+}
+</style>
+{% block sales_styles %}{% endblock %}
+{% endblock %}

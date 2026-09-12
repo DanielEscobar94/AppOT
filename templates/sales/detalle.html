@@ -1,0 +1,519 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{%- set detalles = detalles if (detalles is defined and detalles is not none) else [] -%}
+<!-- Debug: {{ detalles | length }} detalles -->
+{% set descuento_val = (venta.descuento|int) if (venta.descuento is not none) else 0 %}
+{% set detalles_total = 0 %}
+{% for item in detalles %}
+  {% set detalles_total = detalles_total + (item.cantidad * item.precio_unitario) %}
+{% endfor %}
+{% if detalles_total == 0 and venta.total %}
+  {% set detalles_total = venta.total %}
+{% endif %}
+{% if (not descuento_val or descuento_val == 0) and detalles_total and (venta.total is not none) %}
+  {% set inferred = (detalles_total|int) - (venta.total|int) %}
+  {% if inferred > 0 %}
+    {% set descuento_val = inferred %}
+  {% endif %}
+{% endif %}
+
+{% if pos %}
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-10 col-sm-8 col-md-6">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            {% if pos_cfg.show_company %}
+              <div class="fw-bold">{{ company_name }}</div>
+            {% endif %}
+            {% if pos_cfg.include_address and company_address %}
+              <div class="small">{{ company_address }}</div>
+            {% endif %}
+          </div>
+          {# removed 'Ver factura' link as requested - POS should not show that button #}
+        </div>
+          <div class="border-top my-2"></div>
+
+  <div class="small">Fecha: {{ venta.fecha|local_datetime('%Y-%m-%d %H:%M') if venta.fecha else '—' }}</div>
+        <div class="small">Factura: {{ venta.numero_factura or venta.id }}</div>
+        <div class="small">Cliente: {{ venta.cliente.nombre if venta.cliente else '---' }}</div>
+
+        <div class="border-top my-2"></div>
+
+  {% for d in detalles %}
+          <div class="d-flex justify-content-between small">
+            <div class="text-truncate" style="max-width:65%">{{ d.get_nombre_display() }}{% if d.producto and d.producto.sku %} (SKU: {{ d.producto.sku }}){% endif %}</div>
+            <div class="mx-2">{{ d.cantidad }}</div>
+            <div>${{ "{:,}".format((d.precio_unitario|float)|round(0)|int).replace(",", ".") }}</div>
+          </div>
+        {% endfor %}
+
+      {% set detalles_total = 0 %}
+  {% for item in detalles %}
+        {% set detalles_total = detalles_total + (item.cantidad * item.precio_unitario) %}
+      {% endfor %}
+      {% if detalles_total == 0 and venta.total %}
+        {% set detalles_total = venta.total %}
+      {% endif %}
+        <div class="d-flex justify-content-between">
+          <div>Subtotal</div>
+          <div>${{ "{:,}".format((detalles_total|float)|round(0)|int).replace(",", ".") }}</div>
+        </div>
+        {% set descuento_val = (venta.descuento|int) if (venta.descuento is not none) else 0 %}
+        {# If the venta record doesn't have descuento stored (older records), infer it by
+           comparing the sum of line subtotals (detalles_total) with venta.total. This
+           covers historical sales where per-line discounts were submitted but not
+           persisted on the Venta row. #}
+        {% if (not descuento_val or descuento_val == 0) and detalles_total and (venta.total is not none) %}
+          {% set inferred = (detalles_total|int) - (venta.total|int) %}
+          {% if inferred > 0 %}
+            {% set descuento_val = inferred %}
+          {% endif %}
+        {% endif %}
+        {% set anticipo_val = (venta.anticipo_total|int) if (venta.anticipo_total is not none) else 0 %}
+        {% if descuento_val and descuento_val > 0 %}
+        <div class="d-flex justify-content-between text-danger">
+          <div>Descuento {% if detalles_total > 0 %}({{ ((descuento_val / detalles_total) * 100)|round(2) }}%){% endif %}</div>     
+          <div>-${{ "{:,}".format(descuento_val|int).replace(",", ".") }}</div>
+        </div>
+        {% endif %}
+        {% if anticipo_val and anticipo_val > 0 %}
+        <div class="d-flex justify-content-between text-muted">
+          <div>Anticipo</div>
+          <div>-${{ "{:,}".format(anticipo_val|int).replace(",", ".") }}</div>
+        </div>
+        {% endif %}
+        <div class="d-flex justify-content-between fw-bold">
+          <div>Total</div>
+          {% set neto_calc = (detalles_total|int) - (descuento_val|int) - (anticipo_val|int) %}
+          <div>${{ "{:,}".format(neto_calc|int).replace(",", ".") }}</div>
+        </div>
+
+        <div class="text-center border-top mt-3">GRACIAS POR SU COMPRA</div>
+      </div>
+    </div>
+  </div>
+
+  {% if pos_cfg.auto_print %}
+  <script>
+    // Autoprint for POS view (controlled from dashboard)
+    window.addEventListener('DOMContentLoaded', function(){
+      try {
+        // Open print confirmation modal. If confirmed, print.
+        if (typeof openPrintConfirmModal === 'function') {
+          openPrintConfirmModal(function(){ try{ window.print(); }catch(e){} });
+        } else {
+          // fallback direct print
+          try{ window.print(); }catch(e){}
+        }
+      } catch(e) {}
+    });
+  </script>
+  {% endif %}
+
+{% else %}
+  <div class="card shadow rounded-4 border-0 mb-4">
+    <div class="card-header bg-dark text-white fw-bold rounded-top-4 d-flex justify-content-between align-items-center">
+      <div>
+        <div><i class="bi bi-receipt"></i> Detalle de Venta - Factura #{{ venta.numero_factura or venta.id }}</div>
+        <small class="fw-normal">Fecha de elaboración: {{ venta.fecha|local_datetime('%d/%m/%Y %H:%M') if venta.fecha else '—' }}</small>
+      </div>
+      <div>
+        <a href="{{ url_for('sales.reimprimir', venta_id=venta.id) }}" class="btn btn-primary btn-sm" target="_blank">
+          <i class="bi bi-printer"></i> Imprimir Ticket
+        </a>
+        {% if not venta.eliminada and current_user.rol in ['vendedor', 'supervisor', 'admin'] %}
+        <button class="btn btn-danger btn-sm ms-2" onclick="solicitarEliminacion()" id="btnSolicitarEliminacion">
+          <i class="bi bi-trash"></i> Solicitar Eliminación
+        </button>
+        {% endif %}
+        {% if venta.eliminada %}
+        <span class="badge bg-danger ms-2">ELIMINADA</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- Alerta si la venta está eliminada -->
+      {% if venta.eliminada %}
+      <div class="alert alert-danger">
+        <h5><i class="bi bi-exclamation-triangle-fill"></i> Venta Eliminada</h5>
+        <p><strong>Motivo:</strong> {{ venta.motivo_eliminacion or 'Sin motivo especificado' }}</p>
+        <p><strong>Eliminada por:</strong> {{ venta.eliminada_por.username if venta.eliminada_por else '—' }}</p>
+        <p><strong>Fecha de eliminación:</strong> {{ venta.fecha_eliminacion|local_datetime if venta.fecha_eliminacion else '—' }}</p>
+      </div>
+      {% endif %}
+      
+      <!-- Informacion del cliente -->
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <h6 class="fw-bold mb-2">Cliente</h6>
+          <div><strong>Nombre:</strong> {{ venta.cliente.nombre }}</div>
+          <div><strong>Identificacion:</strong> {{ venta.cliente.cc or venta.cliente.nit or "—" }}</div>
+          <div><strong>Correo:</strong> {{ venta.cliente.correo or "—" }}</div>
+          <div><strong>Telefono:</strong> {{ venta.cliente.telefono or "—" }}</div>
+          <div><strong>Orden ID:</strong> {{ venta.orden_id or "—" }}
+          {% if venta.orden and venta.orden.consecutivo %}
+            <span class="badge bg-info text-dark ms-2">Consecutivo OT: {{ venta.orden.consecutivo }}</span>
+          {% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-bold mb-2">Información de Caja</h6>
+          <div>
+            <strong>Caja de Trámite:</strong> 
+            <span class="badge {{ 'bg-success' if venta.caja_tramite == 'appot' else 'bg-primary' }} fs-6" id="cajaBadge">
+              {{ venta.caja_tramite|upper if venta.caja_tramite else 'APPOT' }}
+            </span>
+            {% if not venta.eliminada and current_user.rol in ['supervisor', 'admin'] %}
+            <button class="btn btn-sm btn-outline-warning ms-2" onclick="abrirModalCambioCaja()" title="Cambiar caja">
+              <i class="bi bi-arrow-left-right"></i> Cambiar
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="table-responsive">
+        {% if venta.orden_id and venta.orden and venta.orden.articulos_json %}
+          {# Mostrar artículos agrupados por orden de trabajo #}
+          {% set articulos = venta.orden.articulos_json | fromjson %}
+          {% for articulo in articulos %}
+            <div class="mb-4">
+              <h6 class="text-primary fw-bold">
+                Artículo {{ loop.index }}: {{ articulo.tipo | upper }}
+                {% if articulo.marca %} - {{ articulo.marca }}{% endif %}
+                {% if articulo.referencia %} - {{ articulo.referencia }}{% endif %}
+              </h6>
+              {% if articulo.sitio_reparacion_id and sitios_dict %}
+                <div class="alert alert-secondary p-2 mb-2">
+                  <i class="bi bi-geo-alt-fill"></i> <strong>Sitio de Reparación:</strong> {{ sitios_dict.get(articulo.sitio_reparacion_id, 'N/A') }}
+                </div>
+              {% endif %}
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Producto</th>
+                    <th class="text-center">Cantidad</th>
+                    <th class="text-end">Precio Unitario</th>
+                    <th class="text-center">Descuento %</th>
+                    <th class="text-end">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for prod in articulo.productos %}
+                  <tr>
+                    <td>{{ prod.sku }}</td>
+                    <td class="text-center">{{ prod.cantidad }}</td>
+                    <td class="text-end">${{ "{:,}".format((prod.precio) | round(0) | int).replace(",", ".") }}</td>
+                    <td class="text-center">
+                      {% if prod.descuento and prod.descuento > 0 %}
+                        {{ prod.descuento | int }}%
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
+                    <td class="text-end">${{ "{:,}".format(((prod.precio * prod.cantidad) * (1 - prod.descuento / 100)) | int).replace(",", ".") }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          {# Mostrar productos tradicionales (sin agrupación) #}
+          <table class="table table-bordered table-striped align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Producto</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-end">Precio Unitario</th>
+                <th class="text-center">Descuento %</th>
+                <th class="text-end">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+          {% for item in detalles %}
+              <tr>
+                <td>{{ item.get_nombre_display() }}</td>
+                <td class="text-center">{{ item.cantidad }}</td>
+                <td class="text-end">${{ "{:,}".format((item.precio_unitario) | round(0) | int).replace(",", ".") }}</td>
+                <td class="text-center">
+                  {% if item.descuento_porcentaje and item.descuento_porcentaje > 0 %}
+                    {{ item.descuento_porcentaje | int }}%
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="text-end">${{ "{:,}".format((item.cantidad * item.precio_unitario) | int).replace(",", ".") }}</td>
+              </tr>
+          {% endfor %}
+          {% if not detalles %}
+              <tr>
+                <td colspan="5" class="text-center text-muted">No hay productos registrados en esta venta.</td>
+              </tr>
+          {% endif %}
+            </tbody>
+            <tfoot class="table-light">
+              {% if detalles_total == 0 and venta.total %}
+                {% set detalles_total = venta.total %}
+              {% endif %}
+              {% set anticipo_val = (venta.anticipo_total|int) if (venta.anticipo_total is not none) else 0 %}
+              <tr>
+                <th colspan="3" class="text-end">Subtotal:</th>
+                <th colspan="2" class="text-end">${{ "{:,}".format((detalles_total|int)).replace(",", ".") }}</th>
+              </tr>
+              {% if descuento_val and descuento_val > 0 %}
+              <tr>
+                <th colspan="3" class="text-end text-danger">Descuento:</th>
+                <th colspan="2" class="text-end text-danger">-${{ "{:,}".format(descuento_val|int).replace(",", ".") }}</th>
+              </tr>
+              {% endif %}
+              {% if anticipo_val and anticipo_val > 0 %}
+              <tr>
+                <th colspan="3" class="text-end text-muted">Anticipo:</th>
+                <th colspan="2" class="text-end text-muted">-${{ "{:,}".format(anticipo_val|int).replace(",", ".") }}</th>
+              </tr>
+              {% endif %}
+              <tr>
+                <th colspan="3" class="text-end fw-bold">Total:</th>
+                {% set neto_calc = (detalles_total|int) - (descuento_val|int) - (anticipo_val|int) %}
+                <th colspan="2" class="text-end fw-bold">${{ "{:,}".format(neto_calc|int).replace(",", ".") }}</th>
+              </tr>
+            </tfoot>
+          </table>
+        {% endif %}
+        
+        {# Mostrar totales globales si viene de orden #}
+        {% if venta.orden_id and venta.orden and venta.orden.articulos_json %}
+          <div class="mt-3 p-3 bg-light border rounded">
+            <div class="row">
+              <div class="col-md-6">
+                {% set anticipo_val = (venta.anticipo_total|int) if (venta.anticipo_total is not none) else 0 %}
+                <p class="mb-1">Subtotal: <span class="fw-bold">${{ "{:,}".format((detalles_total|int)).replace(",", ".") }}</span></p>
+                {% if descuento_val and descuento_val > 0 %}
+                <p class="mb-1 text-danger">Descuento: <span class="fw-bold">-${{ "{:,}".format(descuento_val|int).replace(",", ".") }}</span></p>
+                {% endif %}
+                {% if anticipo_val and anticipo_val > 0 %}
+                <p class="mb-0 text-muted">Anticipo: <span class="fw-bold">-${{ "{:,}".format(anticipo_val|int).replace(",", ".") }}</span></p>
+                {% endif %}
+              </div>
+              <div class="col-md-6 text-end">
+                <h4 class="mb-0">
+                  <span class="text-muted">Total:</span>
+                  {% set neto_calc = (detalles_total|int) - (descuento_val|int) - (anticipo_val|int) %}
+                  <span class="fw-bold text-primary">${{ "{:,}".format(neto_calc|int).replace(",", ".") }}</span>
+                </h4>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      <!-- Boton para volver -->
+      <div class="mt-4 text-end">
+        <a href="{{ url_for('sales.listar') }}" class="btn btn-outline-secondary" id="btn-volver">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+      <script>
+        (function() {
+          var params = new URLSearchParams(window.location.search);
+          if (params.get('ref') === 'reportes') {
+            var returnUrl = sessionStorage.getItem('reportes_ventas_return_url');
+            if (returnUrl) {
+              document.getElementById('btn-volver').href = returnUrl;
+            }
+          }
+        })();
+      </script>
+    </div>
+  </div>
+{% endif %}
+
+{% if pos %}
+{# Print confirmation modal (Bootstrap) - only show for POS mode #}
+<div class="modal fade" id="printConfirmModal" tabindex="-1" aria-labelledby="printConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="printConfirmModalLabel">¿Desea imprimir?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p id="printConfirmModalMessage">¿Desea imprimir el ticket?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="printConfirmPrint" class="btn btn-primary" onclick="window.print()">Imprimir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Simple print modal function
+  function openPrintConfirmModal(callback) {
+    var modalEl = document.getElementById('printConfirmModal');
+    if (modalEl) {
+      var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+  }
+</script>
+{% endif %}
+
+<!-- Modal para solicitar eliminación -->
+<div class="modal fade" id="modalSolicitarEliminacion" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-trash"></i> Solicitar Eliminación de Venta</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i> Esta solicitud será enviada a supervisores y administradores para su aprobación.
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Motivo de la eliminación <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="motivoEliminacion" rows="4" placeholder="Explica detalladamente por qué debe eliminarse esta venta..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" onclick="confirmarSolicitud()">
+          <i class="bi bi-send"></i> Enviar Solicitud
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para cambiar caja -->
+<div class="modal fade" id="modalCambioCaja" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Cambiar Caja de Trámite</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Esto cambiará la caja a la que está asignada esta venta.
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Caja Actual: <strong><span id="cajaActual">{{ venta.caja_tramite|upper if venta.caja_tramite else 'APPOT' }}</span></strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Nueva Caja <span class="text-danger">*</span></label>
+          <select class="form-select" id="nuevaCaja">
+            <option value="">-- Seleccionar --</option>
+            <option value="appot" {% if venta.caja_tramite != 'appot' %}selected{% endif %}>APPOT</option>
+            <option value="siigo" {% if venta.caja_tramite != 'siigo' %}selected{% endif %}>SIIGO</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" onclick="confirmarCambioCaja()">
+          <i class="bi bi-check-lg"></i> Confirmar Cambio
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function solicitarEliminacion() {
+  const modal = new bootstrap.Modal(document.getElementById('modalSolicitarEliminacion'));
+  modal.show();
+}
+
+async function confirmarSolicitud() {
+  const motivo = document.getElementById('motivoEliminacion').value.trim();
+  
+  if (!motivo) {
+    alert('Debes especificar el motivo de la eliminación');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/ventas/{{ venta.id }}/solicitar_eliminacion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo })
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      alert('Solicitud enviada exitosamente. Será revisada por un supervisor o administrador.');
+      document.getElementById('btnSolicitarEliminacion').disabled = true;
+      document.getElementById('btnSolicitarEliminacion').textContent = 'Solicitud Enviada';
+      bootstrap.Modal.getInstance(document.getElementById('modalSolicitarEliminacion')).hide();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo enviar la solicitud'));
+    }
+  } catch (error) {
+    alert('Error de conexión: ' + error.message);
+  }
+}
+
+function abrirModalCambioCaja() {
+  const modal = new bootstrap.Modal(document.getElementById('modalCambioCaja'));
+  modal.show();
+}
+
+async function confirmarCambioCaja() {
+  const nuevaCaja = document.getElementById('nuevaCaja').value.trim();
+  
+  if (!nuevaCaja) {
+    alert('Debes seleccionar una caja');
+    return;
+  }
+  
+  if (!confirm(`¿Estás seguro de cambiar la caja a ${nuevaCaja.toUpperCase()}?`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch('/ventas/{{ venta.id }}/cambiar_caja', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caja_tramite: nuevaCaja })
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      alert('Caja cambiada exitosamente de "' + data.caja_anterior.toUpperCase() + '" a "' + data.caja_nueva.toUpperCase() + '"');
+      // Actualizar el badge en la página
+      const badge = document.getElementById('cajaBadge');
+      badge.textContent = data.caja_nueva.toUpperCase();
+      badge.className = 'badge fs-6 ' + (data.caja_nueva === 'appot' ? 'bg-success' : 'bg-primary');
+      document.getElementById('cajaActual').textContent = data.caja_nueva.toUpperCase();
+      bootstrap.Modal.getInstance(document.getElementById('modalCambioCaja')).hide();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo cambiar la caja'));
+    }
+  } catch (error) {
+    alert('Error de conexión: ' + error.message);
+  }
+}
+</script>
+
+<style>
+@media print {
+  body {
+    font-size: 16px;
+    font-weight: bold;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+}
+</style>
+
+{% endblock %}

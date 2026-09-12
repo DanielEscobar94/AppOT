@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">{% if is_edit %}Editar Usuario{% else %}Nuevo Usuario{% endif %}</h2>
+
+<form method="POST">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    {{ form.username.label(class="form-label") }}
+    {{ form.username(class="form-control") }}
+    {% for error in form.username.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.email.label(class="form-label") }}
+    {{ form.email(class="form-control") }}
+    {% for error in form.email.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.password.label(class="form-label") }}
+    {{ form.password(class="form-control") }}
+    {% for error in form.password.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.rol.label(class="form-label") }}
+    {{ form.rol(class="form-select") }}
+    {% for error in form.rol.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3">
+    {{ form.branch_id.label(class="form-label") }}
+    {{ form.branch_id(class="form-select") }}
+    {% for error in form.branch_id.errors %}
+      <div class="text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary">{% if is_edit %}Actualizar{% else %}Guardar{% endif %}</button>
+  <a href="{{ url_for('users.listar') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

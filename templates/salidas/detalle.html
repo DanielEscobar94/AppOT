@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold text-primary mb-1">
+        <i class="bi bi-box-arrow-right"></i> Detalle de Salidas
+      </h2>
+      <h4 class="text-muted">{{ producto.nombre }} ({{ producto.sku or 'Sin SKU' }})</h4>
+    </div>
+    <button onclick="history.back()" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver
+    </button>
+  </div>
+
+  <!-- Filtros aplicados -->
+  {% if sucursal_id or fecha_desde or fecha_hasta %}
+  <div class="alert alert-info">
+    <strong>Filtros aplicados:</strong>
+    {% if sucursal_id %}
+      {% for s in sucursales %}
+        {% if s.id == sucursal_id %}Sucursal: {{ s.nombre }}{% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if fecha_desde %} | Desde: {{ fecha_desde }}{% endif %}
+    {% if fecha_hasta %} | Hasta: {{ fecha_hasta }}{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Estadisticas del producto -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card border-primary">
+        <div class="card-body text-center">
+          <h3 class="text-primary">{{ ventas_detalle|length }}</h3>
+          <p class="mb-0">Total de Ventas</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-warning">
+        <div class="card-body text-center">
+          <h3 class="text-warning">{{ ventas_detalle|sum(attribute='cantidad')|int }}</h3>
+          <p class="mb-0">Unidades Vendidas</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-success">
+        <div class="card-body text-center">
+          <h3 class="text-success">${{ "{:,.0f}".format(ventas_detalle|sum(attribute='subtotal')|float).replace(",", ".") }}</h3>
+          <p class="mb-0">Valor Total</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de ventas detalladas -->
+  <div class="card">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">Historial de Ventas</h5>
+    </div>
+    <div class="card-body p-0">
+      {% if ventas_detalle %}
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Factura</th>
+                <th>Sucursal</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-end">Precio Unit.</th>
+                <th class="text-end">Subtotal</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for venta in ventas_detalle %}
+              <tr>
+                <td>{{ venta.fecha|local_datetime if venta.fecha else '—' }}</td>
+                <td class="fw-bold">{{ venta.numero_factura or venta.id }}</td>
+                <td>
+                  <span class="badge bg-secondary">{{ venta.sucursal_nombre }}</span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-warning text-dark">{{ venta.cantidad|int }}</span>
+                </td>
+                <td class="text-end">${{ "{:,.0f}".format(venta.precio_unitario|float).replace(",", ".") }}</td>
+                <td class="text-end fw-bold text-success">${{ "{:,.0f}".format(venta.subtotal|float).replace(",", ".") }}</td>
+                <td class="text-center">
+                  <a href="{{ url_for('sales.ver', venta_id=venta.id) }}" 
+                     class="btn btn-sm btn-outline-primary" title="Ver venta completa" target="_blank">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-dark">
+              <tr>
+                <th colspan="3" class="text-end">TOTALES:</th>
+                <th class="text-center">{{ ventas_detalle|sum(attribute='cantidad')|int }}</th>
+                <th></th>
+                <th class="text-end">${{ "{:,.0f}".format(ventas_detalle|sum(attribute='subtotal')|float).replace(",", ".") }}</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center p-5">
+          <i class="bi bi-inbox display-1 text-muted"></i>
+          <h4 class="text-muted mt-3">No hay ventas registradas</h4>
+          <p class="text-muted">Este producto no tiene ventas con los filtros aplicados.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

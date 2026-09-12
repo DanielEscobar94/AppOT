@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% block title %}Reporte de Anticipos{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- ─── Header ─── -->
+    <div class="bg-dark text-white bg-gradient px-4 py-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-cash-stack" style="color:#818cf8;"></i>
+            Reporte de Anticipos
+          </h4>
+          <p class="mb-0 small opacity-50">Anticipos recibidos, aplicados y pendientes</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Filtros ─── -->
+    <div class="bg-light px-4 py-3 border-bottom">
+      <div class="alert alert-info mb-3 py-2 small">
+        <i class="bi bi-info-circle-fill"></i> Los anticipos <span class="badge bg-primary"><i class="bi bi-info-circle"></i> Siigo</span> se muestran para referencia pero no se contabilizan en el cuadre de caja.
+      </div>
+      <form method="GET" class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Sucursal</label>
+          <select name="sucursal" id="sucursal" class="form-select form-select-sm">
+            <option value="">Todas las sucursales</option>
+            {% for branch in branches %}
+            <option value="{{ branch.id }}" {% if request.args.get('sucursal') == branch.id|string %}selected{% endif %}>
+              {{ branch.nombre }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Inicial</label>
+          <input type="date" name="desde" id="desde" class="form-control form-control-sm"
+                 value="{{ request.args.get('desde') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha Final</label>
+          <input type="date" name="hasta" id="hasta" class="form-control form-control-sm"
+                 value="{{ request.args.get('hasta') }}">
+        </div>
+        <div class="col-md-3 d-flex gap-1">
+          <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-search"></i> Filtrar</button>
+          <a href="{{ url_for('reportes.anticipos') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+            <i class="bi bi-x-circle"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+
+    {% if anticipos %}
+    {% set anticipos_aplicados = [] %}
+    {% set anticipos_pendientes = [] %}
+    {% for anticipo in anticipos %}
+      {% if anticipo.venta_id %}
+        {% set _ = anticipos_aplicados.append(anticipo) %}
+      {% else %}
+        {% set _ = anticipos_pendientes.append(anticipo) %}
+      {% endif %}
+    {% endfor %}
+
+    <!-- ─── Resumen ─── -->
+    <div class="px-4 py-3 border-bottom">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="p-3 bg-success bg-opacity-10 rounded-3 text-center">
+            <div class="text-success fw-bold fs-4">{{ anticipos_aplicados|length }}</div>
+            <small class="text-muted">Anticipos Aplicados <span class="text-muted">(Facturados)</span></small>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-danger bg-opacity-10 rounded-3 text-center">
+            <div class="text-danger fw-bold fs-4">{{ anticipos_pendientes|length }}</div>
+            <small class="text-muted">Anticipos Pendientes <span class="text-muted">(Sin facturar)</span></small>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-primary bg-opacity-10 rounded-3 text-center">
+            <div class="text-primary fw-bold fs-4">${{ "{:,.0f}".format(total_appot).replace(",", ".") }}</div>
+            <small class="text-muted">Total AppOT <span class="text-muted">(Efectivo)</span></small>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-info bg-opacity-10 rounded-3 text-center">
+            <div class="text-info fw-bold fs-4">${{ "{:,.0f}".format(total_siigo).replace(",", ".") }}</div>
+            <small class="text-muted">Total Siigo <span class="text-muted">(Tarjeta/Transferencia)</span></small>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ─── Tabla ─── -->
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Fecha</th>
+            <th>OT</th>
+            <th>Cliente</th>
+            <th>Sucursal</th>
+            <th>Método de Pago</th>
+            <th>Caja</th>
+            <th>Estado</th>
+            <th class="text-end">Monto</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for anticipo in anticipos %}
+          <tr>
+            <td class="small">{{ anticipo.fecha|local_datetime if anticipo.fecha else '—' }}</td>
+            <td>
+              <a href="{{ url_for('ordenes.ver_orden', orden_id=anticipo.orden.id) }}" class="text-decoration-none fw-semibold">
+                OT-{{ anticipo.orden.consecutivo or anticipo.orden.id }}
+              </a>
+            </td>
+            <td>{{ anticipo.orden.client.nombre if anticipo.orden.client else '—' }}</td>
+            <td><span class="badge bg-secondary">{{ anticipo.orden.branch.nombre if anticipo.orden.branch else '—' }}</span></td>
+            <td><span class="badge bg-secondary">{{ anticipo.metodo_pago or '—' }}</span></td>
+            <td>
+              {% if anticipo.caja_tramite == 'siigo' %}
+                <span class="badge bg-primary"><i class="bi bi-info-circle"></i> Siigo</span>
+              {% else %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-check-circle"></i> AppOT</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if anticipo.venta_id %}
+                <span class="badge bg-success">Aplicado</span>
+                {% if anticipo.venta %}
+                <a href="{{ url_for('sales.ver', venta_id=anticipo.venta_id) }}" class="badge bg-primary text-decoration-none ms-1" target="_blank">
+                  FAC-{{ anticipo.venta.numero_factura or anticipo.venta_id }}
+                </a>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-danger">Pendiente</span>
+              {% endif %}
+            </td>
+            <td class="text-end fw-bold">${{ "{:,.0f}".format(anticipo.monto).replace(",", ".") }}</td>
+            <td class="text-center">
+              <a href="{{ url_for('ordenes.ver_orden', orden_id=anticipo.orden.id) }}" class="btn btn-sm btn-outline-info border-0" title="Ver OT">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center py-4 text-muted">
+              No se encontraron anticipos con los filtros aplicados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ─── Contador ─── -->
+    {% if anticipos_pagination is defined and anticipos_pagination.total > 0 %}
+    <div class="px-4 py-2 border-top text-muted small">
+      {% set start = (anticipos_pagination.page - 1) * anticipos_pagination.per_page + 1 %}
+      {% set end = (anticipos_pagination.page - 1) * anticipos_pagination.per_page + (anticipos|length) %}
+      Mostrando {{ start }}–{{ end }} de {{ anticipos_pagination.total }} anticipo(s) | Página {{ anticipos_pagination.page }} de {{ anticipos_pagination.pages }}
+    </div>
+    {% endif %}
+
+    <!-- ─── Paginación ─── -->
+    {% if anticipos_pagination is defined and anticipos_pagination.pages > 1 %}
+    <div class="px-4 pb-3">
+      <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+        {% if anticipos_pagination.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('reportes.anticipos', sucursal=request.args.get('sucursal'), desde=request.args.get('desde'), hasta=request.args.get('hasta'), page=1, per_page=request.args.get('per_page', 25)) }}">Primera</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('reportes.anticipos', sucursal=request.args.get('sucursal'), desde=request.args.get('desde'), hasta=request.args.get('hasta'), page=anticipos_pagination.prev_num, per_page=request.args.get('per_page', 25)) }}">Anterior</a>
+        </li>
+        {% endif %}
+        {% for page_num in anticipos_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if page_num %}
+            <li class="page-item {% if page_num == anticipos_pagination.page %}active{% endif %}">
+              <a class="page-link" href="{{ url_for('reportes.anticipos', sucursal=request.args.get('sucursal'), desde=request.args.get('desde'), hasta=request.args.get('hasta'), page=page_num, per_page=request.args.get('per_page', 25)) }}">{{ page_num }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        {% if anticipos_pagination.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('reportes.anticipos', sucursal=request.args.get('sucursal'), desde=request.args.get('desde'), hasta=request.args.get('hasta'), page=anticipos_pagination.next_num, per_page=request.args.get('per_page', 25)) }}">Siguiente</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('reportes.anticipos', sucursal=request.args.get('sucursal'), desde=request.args.get('desde'), hasta=request.args.get('hasta'), page=anticipos_pagination.pages, per_page=request.args.get('per_page', 25)) }}">Última</a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if anticipos %}
+    <!-- ─── Resumen Total ─── -->
+    <div class="px-4 py-3 border-top">
+      <div class="row justify-content-center">
+        <div class="col-auto">
+          <div class="p-3" style="min-width:320px;">
+            <h6 class="fw-bold text-center text-secondary mb-3"><i class="bi bi-calculator"></i> Resumen de Anticipos</h6>
+            <div class="d-flex justify-content-between py-1">
+              <span class="fw-semibold">Total Anticipos AppOT:</span>
+              <span class="fw-bold text-success">${{ "{:,.0f}".format(total_appot).replace(",", ".") }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1">
+              <span class="fw-semibold">Total Anticipos Siigo:</span>
+              <span class="fw-bold text-info">${{ "{:,.0f}".format(total_siigo).replace(",", ".") }}</span>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between py-1">
+              <span class="fw-semibold">Total General:</span>
+              <span class="fw-bold text-primary">${{ "{:,.0f}".format(total_general).replace(",", ".") }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Editar Cliente</h2>
+
+<form method="POST" id="form-editar-cliente">
+  {{ form.hidden_tag() }}
+
+  <!-- Nombre -->
+  <div class="mb-3">
+    {{ form.nombre.label(class="form-label") }}
+    {{ form.nombre(class="form-control text-uppercase") }}
+    {% for error in form.nombre.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Tipo de cliente -->
+  <div class="mb-3">
+    <label for="tipo" class="form-label">Tipo de cliente</label>
+    <select id="tipo" name="tipo" class="form-select" required>
+      <option value="natural" {% if cliente.cc %}selected{% endif %}>Persona Natural</option>
+      <option value="empresa" {% if cliente.nit %}selected{% endif %}>Empresa</option>
+    </select>
+  </div>
+
+  <!-- Identificacion: CC -->
+  <div class="mb-3 {% if not cliente.cc %}d-none{% endif %}" id="grupo-cc">
+    <label for="cc" class="form-label">Cedula de Ciudadania</label>
+    <input type="text" name="cc" id="cc" class="form-control" value="{{ cliente.cc }}">
+  </div>
+
+  <!-- Identificacion: NIT -->
+  <div class="mb-3 {% if not cliente.nit %}d-none{% endif %}" id="grupo-nit">
+    <label for="nit" class="form-label">NIT empresarial</label>
+    <input type="text" name="nit" id="nit" class="form-control" value="{{ cliente.nit }}">
+  </div>
+
+  <!-- Correo -->
+  <div class="mb-3">
+    {{ form.correo.label(class="form-label") }}
+    {{ form.correo(class="form-control") }}
+    {% for error in form.correo.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Telefono -->
+  <div class="mb-3">
+    {{ form.telefono.label(class="form-label") }}
+    {{ form.telefono(class="form-control") }}
+    {% for error in form.telefono.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary">Actualizar</button>
+  <a href="{{ url_for('clients.listar') }}" class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+
+<!-- JS dinamico -->
+<script>
+  const tipo = document.getElementById("tipo");
+  const grupoCC = document.getElementById("grupo-cc");
+  const grupoNIT = document.getElementById("grupo-nit");
+
+  tipo.addEventListener("change", function () {
+    if (this.value === "natural") {
+      grupoCC.classList.remove("d-none");
+      grupoNIT.classList.add("d-none");
+    } else if (this.value === "empresa") {
+      grupoCC.classList.add("d-none");
+      grupoNIT.classList.remove("d-none");
+    } else {
+      grupoCC.classList.add("d-none");
+      grupoNIT.classList.add("d-none");
+    }
+  });
+
+  // Antes de enviar, normalizar campos: preservar formato NIT (con guion) y limpiar CC (solo numeros).
+  (function(){
+    const form = document.getElementById('form-editar-cliente');
+    if (!form) return;
+    form.addEventListener('submit', function(ev){
+      try{
+        const ccEl = document.querySelector('input[name="cc"]');
+        const nitEl = document.querySelector('input[name="nit"]');
+        const tipoEl = document.getElementById('tipo');
+        const ccVal = ccEl ? (ccEl.value || '').trim() : '';
+        const nitVal = nitEl ? (nitEl.value || '').trim() : '';
+
+        // If nit looks like NIT with dv (contains a dash), prefer empresa
+        if (nitVal && nitVal.indexOf('-') !== -1) {
+          if (tipoEl) tipoEl.value = 'empresa';
+        } else if (ccVal) {
+          // sanitize CC to digits only
+          if (ccEl) ccEl.value = ccVal.replace(/\D+/g, '');
+          if (tipoEl) tipoEl.value = 'natural';
+        }
+        // allow submit to proceed
+      }catch(e){/* ignore and let server validate */}
+    });
+  })();
+</script>
+{% endblock %}

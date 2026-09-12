@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow rounded-4 border-0">
+        <div class="card-header bg-dark text-white fw-bold rounded-top-4 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-shield-lock"></i> Gestion de Permisos por Rol</span>
+            <form method="POST" action="{{ url_for('permissions.reset') }}" style="display: inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-light" 
+                        onclick="return confirm('¿Restaurar todos los permisos a valores por defecto?')">
+                    <i class="bi bi-arrow-clockwise"></i> Restaurar Defaults
+                </button>
+            </form>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Instrucciones:</strong> Activa o desactiva los permisos para cada rol haciendo clic en los switches. 
+                Los cambios se guardan automaticamente.
+            </div>
+
+            <!-- Tabs para cada rol -->
+            <ul class="nav nav-tabs mb-4" id="rolesTabs" role="tablist">
+                {% for rol_key, rol_data in roles_info.items() %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if loop.first %}active{% endif %}" 
+                            id="{{ rol_key }}-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#{{ rol_key }}-panel" 
+                            type="button" 
+                            role="tab">
+                        <span class="badge bg-{{ rol_data.color }}">{{ rol_data.nombre }}</span>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <!-- Contenido de cada tab -->
+            <div class="tab-content" id="rolesTabContent">
+                {% for rol_key, rol_data in roles_info.items() %}
+                <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                     id="{{ rol_key }}-panel" 
+                     role="tabpanel">
+                    
+                    <h5 class="mb-3">
+                        <i class="bi bi-person-badge"></i> 
+                        Permisos para <span class="badge bg-{{ rol_data.color }}">{{ rol_data.nombre }}</span>
+                    </h5>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="min-width: 150px;">Modulo</th>
+                                    <th class="text-center" style="min-width: 80px;">Ver</th>
+                                    <th class="text-center" style="min-width: 80px;">Crear</th>
+                                    <th class="text-center" style="min-width: 80px;">Editar</th>
+                                    <th class="text-center" style="min-width: 80px;">Eliminar</th>
+                                    <th class="text-center" style="min-width: 120px;">Otros</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for modulo_key, modulo_info in modules_info.items() %}
+                                {% set permisos_modulo = permissions[rol_key].get(modulo_key, {}) %}
+                                <tr>
+                                    <td>
+                                        <i class="bi {{ modulo_info.icono }}"></i> 
+                                        <strong>{{ modulo_info.nombre }}</strong>
+                                    </td>
+                                    
+                                    <!-- Ver -->
+                                    <td class="text-center">
+                                        {% if 'ver' in permisos_modulo %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="ver"
+                                                   {% if permisos_modulo.ver %}checked{% endif %}>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Crear -->
+                                    <td class="text-center">
+                                        {% if 'crear' in permisos_modulo %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="crear"
+                                                   {% if permisos_modulo.crear %}checked{% endif %}>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Editar -->
+                                    <td class="text-center">
+                                        {% if 'editar' in permisos_modulo %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="editar"
+                                                   {% if permisos_modulo.editar %}checked{% endif %}>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Eliminar -->
+                                    <td class="text-center">
+                                        {% if 'eliminar' in permisos_modulo %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="eliminar"
+                                                   {% if permisos_modulo.eliminar %}checked{% endif %}>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Otros (exportar, reportes especificos, etc) -->
+                                    <td class="text-center">
+                                        {% if 'exportar' in permisos_modulo %}
+                                        <small class="d-block">Exportar:</small>
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="exportar"
+                                                   {% if permisos_modulo.exportar %}checked{% endif %}>
+                                        </div>
+                                        {% elif modulo_key == 'reportes' %}
+                                        <small class="d-block">Ventas:</small>
+                                        <div class="form-check form-switch d-inline-block mb-2">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="ventas"
+                                                   {% if permisos_modulo.ventas %}checked{% endif %}>
+                                        </div>
+                                        <small class="d-block">Reparaciones:</small>
+                                        <div class="form-check form-switch d-inline-block mb-2">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="reparaciones"
+                                                   {% if permisos_modulo.reparaciones %}checked{% endif %}>
+                                        </div>
+                                        <small class="d-block">Anticipo:</small>
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input permission-switch" 
+                                                   type="checkbox" 
+                                                   role="switch"
+                                                   data-rol="{{ rol_key }}"
+                                                   data-modulo="{{ modulo_key }}"
+                                                   data-permiso="anticipos"
+                                                   {% if permisos_modulo.anticipos %}checked{% endif %}>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar cambios en los switches
+    document.querySelectorAll('.permission-switch').forEach(function(switchEl) {
+        switchEl.addEventListener('change', function() {
+            const rol = this.dataset.rol;
+            const modulo = this.dataset.modulo;
+            const permiso = this.dataset.permiso;
+            const valor = this.checked;
+            const switchRef = this;
+            
+            // Mostrar indicador de carga
+            this.disabled = true;
+            
+            // Enviar actualizacion al servidor usando authFetch para manejar 401
+            (window.authFetch || fetch)('{{ url_for("permissions.update") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    rol: rol,
+                    modulo: modulo,
+                    permiso: permiso,
+                    valor: valor
+                })
+            })
+            .then(function(response) {
+                if (response.status === 401) {
+                    // Sesion expirada - redirigir al login
+                    window.location.href = '/users/login?next=' + encodeURIComponent(window.location.pathname);
+                    return null;
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                if (!data) return;
+                if (data.success) {
+                    window.showToast('Permiso actualizado correctamente', 'success');
+                } else {
+                    switchRef.checked = !valor;
+                    window.showToast('Error al actualizar: ' + (data.message || 'Error desconocido'), 'danger');
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                switchRef.checked = !valor;
+                window.showToast('Error de conexion', 'danger');
+            })
+            .finally(function() {
+                switchRef.disabled = false;
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

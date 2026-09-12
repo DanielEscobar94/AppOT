@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+{% block title %}Solicitudes de Eliminación de Ventas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow rounded-4 border-0">
+        <div class="card-header bg-danger text-white fw-bold rounded-top-4">
+            <i class="bi bi-trash"></i> Gestión de Solicitudes de Eliminación
+        </div>
+        <div class="card-body">
+            
+            <!-- Solicitudes Pendientes -->
+            <h5 class="mb-3"><i class="bi bi-hourglass-split"></i> Solicitudes Pendientes ({{ solicitudes_pendientes|length }})</h5>
+            
+            {% if solicitudes_pendientes %}
+            <div class="table-responsive mb-4">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha Solicitud</th>
+                            <th>Venta #</th>
+                            <th>Cliente</th>
+                            <th>Total</th>
+                            <th>Solicitante</th>
+                            <th>Motivo</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for solicitud in solicitudes_pendientes %}
+                        <tr>
+                            <td>{{ solicitud.fecha_solicitud|local_datetime }}</td>
+                            <td>
+                                <a href="{{ url_for('sales.ver', venta_id=solicitud.venta_id) }}">
+                                    {{ solicitud.venta.numero_factura }}
+                                </a>
+                            </td>
+                            <td>{{ solicitud.venta.cliente.nombre }}</td>
+                            <td>${{ "{:,.0f}".format(solicitud.venta.total).replace(",", ".") }}</td>
+                            <td>{{ solicitud.solicitante.username }}</td>
+                            <td>
+                                <small>{{ solicitud.motivo }}</small>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="aprobarSolicitud({{ solicitud.id }})">
+                                    <i class="bi bi-check-circle"></i> Aprobar
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="rechazarSolicitud({{ solicitud.id }})">
+                                    <i class="bi bi-x-circle"></i> Rechazar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No hay solicitudes pendientes
+            </div>
+            {% endif %}
+
+            <!-- Historial -->
+            <h5 class="mb-3 mt-4"><i class="bi bi-clock-history"></i> Historial (últimas 50)</h5>
+            
+            {% if solicitudes_historial %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Venta #</th>
+                            <th>Solicitante</th>
+                            <th>Estado</th>
+                            <th>Aprobador</th>
+                            <th>Comentario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for solicitud in solicitudes_historial %}
+                        <tr>
+                            <td><small>{{ solicitud.fecha_respuesta|local_datetime }}</small></td>
+                            <td>
+                                <a href="{{ url_for('sales.ver', venta_id=solicitud.venta_id) }}">
+                                    {{ solicitud.venta.numero_factura }}
+                                </a>
+                            </td>
+                            <td><small>{{ solicitud.solicitante.username }}</small></td>
+                            <td>
+                                {% if solicitud.estado == 'aprobada' %}
+                                    <span class="badge bg-success">Aprobada</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Rechazada</span>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ solicitud.aprobador.username if solicitud.aprobador else '—' }}</small></td>
+                            <td><small>{{ solicitud.comentario_respuesta or '—' }}</small></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No hay historial
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal para aprobar -->
+<div class="modal fade" id="modalAprobar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle"></i> Aprobar Eliminación</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de aprobar esta solicitud y eliminar la venta?</p>
+                <div class="mb-3">
+                    <label class="form-label">Comentario (opcional)</label>
+                    <textarea class="form-control" id="comentario_aprobar" rows="2" placeholder="Agregar observaciones..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="confirmarAprobar()">Aprobar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para rechazar -->
+<div class="modal fade" id="modalRechazar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle"></i> Rechazar Solicitud</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Indica el motivo del rechazo:</p>
+                <div class="mb-3">
+                    <label class="form-label">Motivo del rechazo <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="comentario_rechazar" rows="3" placeholder="Explica por qué se rechaza..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="confirmarRechazar()">Rechazar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let solicitudIdActual = null;
+
+function aprobarSolicitud(solicitudId) {
+    solicitudIdActual = solicitudId;
+    const modal = new bootstrap.Modal(document.getElementById('modalAprobar'));
+    modal.show();
+}
+
+function rechazarSolicitud(solicitudId) {
+    solicitudIdActual = solicitudId;
+    document.getElementById('comentario_rechazar').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('modalRechazar'));
+    modal.show();
+}
+
+async function confirmarAprobar() {
+    if (!solicitudIdActual) return;
+    
+    const comentario = document.getElementById('comentario_aprobar').value.trim();
+    
+    try {
+        const response = await fetch(`/ventas/solicitudes/${solicitudIdActual}/aprobar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comentario })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            alert('Solicitud aprobada exitosamente');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo aprobar'));
+        }
+    } catch (error) {
+        alert('Error de conexión: ' + error.message);
+    }
+}
+
+async function confirmarRechazar() {
+    if (!solicitudIdActual) return;
+    
+    const comentario = document.getElementById('comentario_rechazar').value.trim();
+    
+    if (!comentario) {
+        alert('Debes especificar el motivo del rechazo');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ventas/solicitudes/${solicitudIdActual}/rechazar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comentario })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            alert('Solicitud rechazada');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo rechazar'));
+        }
+    } catch (error) {
+        alert('Error de conexión: ' + error.message);
+    }
+}
+</script>
+
+{% endblock %}

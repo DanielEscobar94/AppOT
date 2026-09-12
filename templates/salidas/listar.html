@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- ─── Header ─── -->
+    <div class="bg-dark text-white bg-gradient px-4 py-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-box-arrow-right" style="color:#818cf8;"></i>
+            Salidas de Productos
+          </h4>
+          <p class="mb-0 small opacity-50">Historial de ventas y salidas de inventario</p>
+        </div>
+        <a href="{{ url_for('salidas.historial_exportaciones') }}" class="btn btn-light">
+          <i class="bi bi-clock-history"></i> Historial de Exportaciones
+        </a>
+      </div>
+    </div>
+
+    <!-- ─── Filtros ─── -->
+    <div class="bg-light px-4 py-3 border-bottom">
+      <form method="GET">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="small text-uppercase text-muted fw-semibold mb-1">Sucursal</label>
+            <select name="sucursal_id" class="form-select form-select-sm">
+              <option value="">Todas las sucursales</option>
+              {% for s in sucursales %}
+                <option value="{{ s.id }}" {% if sucursal_id == s.id %}selected{% endif %}>{{ s.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha desde</label>
+            <input type="text" name="fecha_desde" class="form-control form-control-sm datepicker" value="{{ fecha_desde or '' }}" placeholder="dd/mm/yyyy">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-uppercase text-muted fw-semibold mb-1">Fecha hasta</label>
+            <input type="text" name="fecha_hasta" class="form-control form-control-sm datepicker" value="{{ fecha_hasta or '' }}" placeholder="dd/mm/yyyy">
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-search"></i> Filtrar</button>
+            <a href="{{ url_for('salidas.listar') }}" class="btn btn-outline-secondary btn-sm flex-fill"><i class="bi bi-x-circle"></i> Limpiar</a>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── Botón exportar filtrados ─── -->
+    {% if sucursal_id or fecha_desde or fecha_hasta %}
+    <div class="px-4 py-2 border-bottom d-flex justify-content-end">
+      <a href="{{ url_for('salidas.exportar_excel', sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}"
+         class="btn btn-success btn-sm">
+        <i class="bi bi-file-earmark-excel"></i> Exportar filtrados
+      </a>
+      <small class="ms-2 text-muted align-self-center">
+        <i class="bi bi-info-circle"></i> Se creará registro en historial
+      </small>
+    </div>
+    {% else %}
+    <div class="px-4 py-2 border-bottom">
+      <small class="text-muted"><i class="bi bi-info-circle"></i> Aplica filtros para exportar datos específicos a Excel</small>
+    </div>
+    {% endif %}
+
+    <!-- ─── Tabla ─── -->
+    <div class="p-0">
+      {% if salidas %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>SKU</th>
+              <th>Producto</th>
+              <th>Sucursal</th>
+              <th class="text-center">Cantidad</th>
+              <th class="text-end">Valor Total</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for salida in salidas %}
+            <tr>
+              <td class="fw-semibold">{{ salida['sku'] or '—' }}</td>
+              <td>{{ salida['producto_nombre'] }}</td>
+              <td><span class="badge bg-secondary">{{ salida['sucursal_nombre'] }}</span></td>
+              <td class="text-center"><span class="badge bg-warning text-dark">{{ salida['cantidad']|int }}</span></td>
+              <td class="text-end fw-semibold">${{ "{:,.0f}".format(salida['valor_total']|float).replace(",", ".") }}</td>
+              <td class="text-center">
+                <a href="{{ url_for('salidas.detalle_producto', producto_id=salida['producto_id'], sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}"
+                   class="btn btn-sm btn-outline-info border-0" title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-dark">
+            <tr>
+              <th colspan="3" class="text-end">TOTALES:</th>
+              <th class="text-center">{{ total_productos_salidos|int }}</th>
+              <th class="text-end">${{ "{:,.0f}".format(valor_total_salidas|float).replace(",", ".") }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- ─── Contador ─── -->
+      <div class="px-4 py-2 border-top text-muted small">
+        {% if pagination and pagination.total > 0 %}
+          {% set start = (pagination.page - 1) * pagination.per_page + 1 %}
+          {% set end = (pagination.page - 1) * pagination.per_page + (pagination.items|length) %}
+          Mostrando {{ start }}–{{ end }} de {{ pagination.total }} registro(s) | Página {{ pagination.page }} de {{ pagination.pages }}
+        {% else %}
+          Mostrando {{ salidas|length }} registro(s)
+        {% endif %}
+      </div>
+
+      <!-- ─── Paginación ─── -->
+      {% if pagination.pages > 1 %}
+      <div class="px-4 pb-3">
+        <ul class="pagination pagination-sm justify-content-center mb-0 d-flex flex-row flex-nowrap overflow-auto" style="-webkit-overflow-scrolling: touch;">
+          {% if pagination.has_prev %}
+          <li class="page-item">
+            <a class="page-link" href="{{ url_for('salidas.listar', page=1, sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}">Primera</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="{{ url_for('salidas.listar', page=pagination.prev_num, sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}">Anterior</a>
+          </li>
+          {% endif %}
+          {% for page_num in pagination.iter_pages() %}
+            {% if page_num %}
+              <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('salidas.listar', page=page_num, sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}">{{ page_num }}</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+          {% endfor %}
+          {% if pagination.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="{{ url_for('salidas.listar', page=pagination.next_num, sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}">Siguiente</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="{{ url_for('salidas.listar', page=pagination.pages, sucursal_id=sucursal_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}">Última</a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="text-center p-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <h4 class="text-muted mt-3">No hay salidas de productos</h4>
+        <p class="text-muted">No se encontraron salidas con los filtros aplicados.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

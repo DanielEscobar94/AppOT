@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Traslado{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-arrow-left-right"></i> Nuevo Traslado entre Bodegas</h2>
+        <a href="{{ url_for('traslados.listar') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <form method="POST" action="{{ url_for('traslados.crear') }}" id="formTraslado">
+        {{ form.hidden_tag() }}
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4 bg-light">
+                <div class="row g-3">
+                    <!-- Primera fila -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-hash text-primary"></i> No. Traslado Siigo *
+                        </label>
+                        {{ form.numero_traslado_siigo(class="form-control", placeholder="Ej: T-2026-001") }}
+                        {% if form.numero_traslado_siigo.errors %}
+                            <div class="text-danger small mt-1">{{ form.numero_traslado_siigo.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-calendar-event text-primary"></i> Fecha del Traslado *
+                        </label>
+                        {{ form.fecha(class="form-control", type="datetime-local") }}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-person-badge text-primary"></i> Responsable *
+                        </label>
+                        <input type="text" name="responsable" id="responsable" class="form-control" placeholder="Nombre del responsable" required>
+                    </div>
+
+                    <!-- Segunda fila -->
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-box-arrow-right text-danger"></i> Sale de (Bodega Origen) *
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-danger text-white"><i class="bi bi-shop"></i></span>
+                            {{ form.branch_origen_id(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end justify-content-center pb-2">
+                        <div class="badge bg-primary rounded-circle p-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-arrow-right" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-box-arrow-in-left text-success"></i> Entra a (Bodega Destino) *
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-success text-white"><i class="bi bi-shop"></i></span>
+                            {{ form.branch_destino_id(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <!-- Tercera fila -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-chat-left-text text-primary"></i> Observación
+                        </label>
+                        {{ form.observacion(class="form-control", rows="2", placeholder="Información adicional sobre el traslado...") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-center gap-3 mb-5">
+            <a href="{{ url_for('traslados.listar') }}" class="btn btn-secondary btn-lg px-5">
+                <i class="bi bi-x-circle"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg px-5">
+                <i class="bi bi-check-circle"></i> Guardar Traslado
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .dropdown-menu {
+        position: absolute;
+        z-index: 1000;
+        min-width: 100%;
+        max-width: 100%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .dropdown-item.active {
+        background-color: #0d6efd !important;
+        color: white !important;
+    }
+    
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    kbd {
+        background-color: #6c757d;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.85em;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productosBody = document.getElementById('productosBody');
+    const btnAgregarProducto = document.getElementById('btnAgregarProducto');
+    let contadorFilas = 0;
+
+    // Agregar fila de producto
+    function agregarFilaProducto() {
+        contadorFilas++;
+        const fila = document.createElement('tr');
+        fila.setAttribute('data-index', contadorFilas);
+        fila.innerHTML = `
+            <td class="text-center fw-bold text-primary">${contadorFilas}</td>
+            <td>
+                <input type="hidden" name="productos[]" class="producto-id" value="0">
+                <input type="text" class="form-control buscador-producto" 
+                       placeholder="Escribe para buscar..." autocomplete="off">
+                <div class="dropdown-menu" style="display:none; max-height: 250px; overflow-y: auto;"></div>
+            </td>
+            <td>
+                <input type="number" name="cantidades[]" class="form-control" 
+                       step="0.01" min="0.01" value="1" required>
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-danger" 
+                        onclick="eliminarFila(${contadorFilas})" title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        // Insertar al INICIO de la tabla (arriba)
+        productosBody.insertBefore(fila, productosBody.firstChild);
+        
+        // Configurar autocompletado para esta fila
+        configurarAutocompletado(fila);
+        
+        // Actualizar numeración
+        actualizarNumeracion();
+        
+        // Enfocar el buscador de la nueva fila (que está arriba)
+        setTimeout(() => {
+            const nuevoBuscador = fila.querySelector('.buscador-producto');
+            nuevoBuscador.focus();
+        }, 100);
+    }
+
+    // Actualizar numeración de filas
+    function actualizarNumeracion() {
+        const filas = productosBody.querySelectorAll('tr');
+        filas.forEach((fila, index) => {
+            const numeroCell = fila.querySelector('td:first-child');
+            if (numeroCell) {
+                numeroCell.textContent = index + 1;
+            }
+        });
+    }
+
+    // Configurar autocompletado de productos
+    function configurarAutocompletado(fila) {
+        const input = fila.querySelector('.buscador-producto');
+        const hiddenInput = fila.querySelector('.producto-id');
+        const dropdown = fila.querySelector('.dropdown-menu');
+        const cantidadInput = fila.querySelector('input[name="cantidades[]"]');
+        let timeoutId;
+        let selectedIndex = -1;
+
+        input.addEventListener('input', function() {
+            clearTimeout(timeoutId);
+            const query = this.value.trim();
+            selectedIndex = -1;
+
+            if (query.length < 2) {
+                dropdown.style.display = 'none';
+                hiddenInput.value = '0';
+                return;
+            }
+
+            timeoutId = setTimeout(() => {
+                fetch(`/traslados/buscar-producto?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(productos => {
+                        if (productos.length === 0) {
+                            dropdown.innerHTML = '<div class="dropdown-item text-muted disabled">No se encontraron productos</div>';
+                        } else {
+                            dropdown.innerHTML = productos.map(p => 
+                                `<a class="dropdown-item" href="#" data-id="${p.id}" data-nombre="${p.nombre}">
+                                    <strong>${p.nombre}</strong>
+                                    ${p.sku ? `<br><small class="text-muted">SKU: ${p.sku}</small>` : ''}
+                                </a>`
+                            ).join('');
+                        }
+                        dropdown.style.display = 'block';
+                    });
+            }, 300);
+        });
+
+        // Navegación por teclado
+        input.addEventListener('keydown', function(e) {
+            const items = dropdown.querySelectorAll('.dropdown-item:not(.disabled)');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                updateSelection(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    items[selectedIndex].click();
+                } else if (items.length > 0) {
+                    items[0].click();
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
+
+        function updateSelection(items) {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // Seleccionar producto del dropdown
+        dropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            const item = e.target.closest('.dropdown-item');
+            if (item && item.dataset.id) {
+                hiddenInput.value = item.dataset.id;
+                input.value = item.dataset.nombre;
+                input.classList.add('is-valid');
+                dropdown.style.display = 'none';
+                cantidadInput.focus();
+                cantidadInput.select();
+            }
+        });
+
+        // Enter en cantidad agrega nueva fila
+        cantidadInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarFilaProducto();
+                // El foco ya se pone automáticamente en la función agregarFilaProducto
+            }
+        });
+
+        // Cerrar dropdown al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            if (!fila.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    // Eliminar fila
+    window.eliminarFila = function(index) {
+        const fila = document.querySelector(`tr[data-index="${index}"]`);
+        if (fila) {
+            if (productosBody.children.length > 1) {
+                fila.remove();
+                actualizarNumeracion();
+            } else {
+                alert('Debe mantener al menos un producto en el traslado');
+            }
+        }
+    };
+
+    // Evento agregar producto
+    btnAgregarProducto.addEventListener('click', agregarFilaProducto);
+
+    // Agregar al menos una fila inicial
+    agregarFilaProducto();
+
+    // Navegación por teclado en los campos principales
+    const numeroTraslado = document.getElementById('numero_traslado_siigo');
+    const fecha = document.getElementById('fecha');
+    const branchOrigen = document.getElementById('branch_origen_id');
+    const branchDestino = document.getElementById('branch_destino_id');
+    const observacion = document.getElementById('observacion');
+
+    numeroTraslado.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            fecha.focus();
+        }
+    });
+
+    fecha.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            branchOrigen.focus();
+        }
+    });
+
+    branchOrigen.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            branchDestino.focus();
+        }
+    });
+
+    branchDestino.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            observacion.focus();
+        }
+    });
+
+    observacion.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const primerBuscador = document.querySelector('.buscador-producto');
+            if (primerBuscador) {
+                primerBuscador.focus();
+            }
+        }
+    });
+
+    // Validación del formulario
+    document.getElementById('formTraslado').addEventListener('submit', function(e) {
+        const origen = document.getElementById('branch_origen_id').value;
+        const destino = document.getElementById('branch_destino_id').value;
+
+        if (!origen || !destino) {
+            e.preventDefault();
+            alert('Debe seleccionar bodega de origen y destino');
+            return false;
+        }
+
+        if (origen === destino) {
+            e.preventDefault();
+            alert('La bodega de origen y destino no pueden ser la misma');
+            return false;
+        }
+
+        // Validar que haya al menos un producto con ID válido
+        const productosIds = document.querySelectorAll('.producto-id');
+        let hayProductoValido = false;
+        productosIds.forEach(input => {
+            if (input.value && input.value !== '0') {
+                hayProductoValido = true;
+            }
+        });
+
+        if (!hayProductoValido) {
+            e.preventDefault();
+            alert('Debe agregar al menos un producto al traslado');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

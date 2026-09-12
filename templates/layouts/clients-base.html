@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+<!-- Template base especifico para modulo de clientes -->
+{% block extra_css %}
+<style>
+/* Estilos especificos del modulo de clientes para evitar conflictos */
+.clients-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.clients-search-input {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e3e6f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.clients-search-input:focus {
+    border-color: #4e73df;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+}
+
+.clients-suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e3e6f0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.clients-suggestion-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f8f9fc;
+    transition: background-color 0.2s ease;
+}
+
+.clients-suggestion-item:hover {
+    background-color: #f8f9fc;
+}
+
+.clients-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.clients-suggestion-content strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.clients-suggestion-content small {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.clients-form-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.clients-card {
+    border: 1px solid #e3e6f0;
+    border-radius: 12px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.clients-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.clients-card-header {
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+}
+
+.clients-card-body {
+    padding: 20px;
+}
+
+.clients-btn-primary {
+    background-color: #4e73df;
+    border-color: #4e73df;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.clients-btn-primary:hover {
+    background-color: #2e59d9;
+    border-color: #2653d4;
+}
+
+.clients-btn-secondary {
+    background-color: #858796;
+    border-color: #858796;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.clients-btn-secondary:hover {
+    background-color: #717384;
+    border-color: #6c6f7d;
+}
+
+.clients-btn-danger {
+    background-color: #e74a3b;
+    border-color: #e74a3b;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.clients-btn-danger:hover {
+    background-color: #c0392b;
+    border-color: #bd362f;
+}
+
+.clients-table {
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.clients-table thead {
+    background-color: #f8f9fc;
+}
+
+.clients-table th {
+    border-bottom: 2px solid #e3e6f0;
+    padding: 15px;
+    font-weight: 600;
+    color: #5a5c69;
+}
+
+.clients-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #e3e6f0;
+    vertical-align: middle;
+}
+
+.clients-table tbody tr:hover {
+    background-color: #f8f9fc;
+}
+
+.clients-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.clients-badge-active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.clients-badge-inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.clients-alert {
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+}
+
+.clients-alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.clients-alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.clients-alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+/* Animaciones especificas */
+.clients-fade-in {
+    animation: clients-fadeIn 0.3s ease-in;
+}
+
+@keyframes clients-fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.clients-slide-down {
+    animation: clients-slideDown 0.2s ease-out;
+}
+
+@keyframes clients-slideDown {
+    from { 
+        opacity: 0; 
+        transform: translateY(-10px); 
+        max-height: 0;
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+        max-height: 300px;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .clients-form-container {
+        padding: 10px;
+    }
+    
+    .clients-card-body {
+        padding: 15px;
+    }
+    
+    .clients-suggestions-container {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        top: auto;
+        max-height: 250px;
+    }
+    
+    .clients-table {
+        font-size: 14px;
+    }
+    
+    .clients-table th,
+    .clients-table td {
+        padding: 8px 10px;
+    }
+}
+
+/* Indicador del modulo (para desarrollo) */
+.clients-module-indicator {
+    position: fixed;
+    bottom: 50px;
+    right: 10px;
+    background-color: #17a2b8;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    z-index: 1000;
+    display: none;
+}
+
+.clients-module-indicator.active {
+    display: block;
+}
+
+/* Estados de carga */
+.clients-loading {
+    position: relative;
+}
+
+.clients-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #4e73df;
+    border-radius: 50%;
+    animation: clients-spin 1s linear infinite;
+    transform: translateY(-50%);
+}
+
+@keyframes clients-spin {
+    0% { transform: translateY(-50%) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- El contenido especifico de cada pagina de clientes se insertara aqui -->
+{{ super() }}
+{% endblock %}
+
+{% block extra_js %}
+<!-- Scripts especificos del modulo de clientes -->
+<script>
+// Marcar la pagina como parte del modulo de clientes
+document.body.classList.add('clients-module');
+
+// Configurar indicador del modulo (opcional, para debug)
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const indicator = document.createElement('div');
+    indicator.className = 'clients-module-indicator';
+    indicator.textContent = 'Clients Module';
+    document.body.appendChild(indicator);
+    
+    // Mostrar indicador cuando el modulo este activo
+    window.addEventListener('load', function() {
+        if (window.ClientsModule && window.ClientsModule.isInitialized()) {
+            indicator.classList.add('active');
+        }
+    });
+}
+
+// Configuracion especifica para el modulo de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar animaciones a elementos de clientes cuando aparezcan
+    const clientElements = document.querySelectorAll('.clients-card, .clients-alert');
+    clientElements.forEach(element => {
+        element.classList.add('clients-fade-in');
+    });
+    
+    // Mejorar experiencia de busqueda
+    const searchInputs = document.querySelectorAll('.clients-search-input, input[name="cliente_nombre"]');
+    searchInputs.forEach(input => {
+        // Agregar clase de carga durante busqueda
+        input.addEventListener('input', function() {
+            if (this.value.length > 2) {
+                this.classList.add('clients-loading');
+            }
+        });
+        
+        // Quitar clase de carga cuando se muestren resultados
+        window.EventBus.on('clients:search-success', function() {
+            input.classList.remove('clients-loading');
+            const suggestionsContainer = document.getElementById('client-suggestions');
+            if (suggestionsContainer && suggestionsContainer.style.display !== 'none') {
+                suggestionsContainer.classList.add('clients-slide-down');
+            }
+        });
+        
+        window.EventBus.on('clients:search-error', function() {
+            input.classList.remove('clients-loading');
+        });
+    });
+});
+</script>
+
+<!-- Cargar el motor de busqueda y el core del modulo de clientes -->
+<script src="{{ url_for('static', filename='js/shared/search-core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modules/clients/clients-core.js') }}"></script>
+{% endblock %}

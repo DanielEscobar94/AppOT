@@ -1,0 +1,43 @@
+{# ----------------------------------------------------------------------------
+  Macro reutilizable: campo de busqueda con autocompletado AppOTSearch.
+  Estandariza el markup de los buscadores de clientes y productos en
+  /clients, /ventas (POS) y ordenes de trabajo: mismo input, mismo
+  contenedor de sugerencias y mismo hidden para el id seleccionado.
+
+  Uso:
+    {% from 'snippets/search_field.html' import search_field %}
+    {{ search_field(input_id='buscar-cliente',
+                    input_name='cliente_nombre',
+                    results_id='client-suggestions',
+                    hidden_id='cliente-id',
+                    label='Cliente',
+                    placeholder='Buscar cliente...') }}
+
+  El JS se conecta con el mismo componente centralizado:
+    AppOTSearch.initClientSearch({ input: '#buscar-cliente',
+                                   results: '#client-suggestions',
+                                   hiddenId: '#cliente-id',
+                                   onSelect: fn });
+    AppOTSearch.initProductSearch({ input: '.buscar-producto', onSelect: fn });
+  Requiere: static/js/shared/search-core.js (Vanilla JS + Bootstrap 5.3).
+---------------------------------------------------------------------------- #}
+{% macro search_field(input_id, results_id='', hidden_id='', label='',
+                      placeholder='Buscar...', value='', input_name='',
+                      input_class='form-control',
+                      results_class='list-group position-absolute w-100 shadow',
+                      results_tag='ul', autocomplete='off') %}
+{% if label %}
+<label for="{{ input_id }}" class="small text-uppercase text-muted fw-semibold mb-1">{{ label }}</label>
+{% endif %}
+<input type="text" id="{{ input_id }}"{% if input_name %} name="{{ input_name }}"{% endif %}
+       class="{{ input_class }}" placeholder="{{ placeholder }}"
+       value="{{ value }}" autocomplete="{{ autocomplete }}"
+       autocapitalize="off" autocorrect="off" spellcheck="false"
+       role="combobox" aria-expanded="false" aria-autocomplete="list">
+{% if hidden_id %}
+<input type="hidden" id="{{ hidden_id }}" name="{{ hidden_id|replace('-', '_') }}" value="">
+{% endif %}
+{% if results_id %}
+<{{ results_tag }} id="{{ results_id }}" class="{{ results_class }}" style="display:none;z-index:1050;"></{{ results_tag }}>
+{% endif %}
+{% endmacro %}
