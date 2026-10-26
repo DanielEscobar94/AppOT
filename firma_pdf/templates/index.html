@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firma PDF</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --txt:#1c1f26; --mut:#6b7280; --acc:#2563eb; --bd:#d8dce3; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161a; --card:#1e2127; --txt:#e8eaee; --mut:#9aa1ad; --acc:#4f8bff; --bd:#343944; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.4 system-ui,sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:1.4rem; margin:0 0 16px; }
+  form { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:20px; display:grid; gap:14px; }
+  label { display:grid; gap:4px; font-size:.9rem; color:var(--mut); }
+  input, select { font:inherit; color:var(--txt); background:var(--bg); border:1px solid var(--bd); border-radius:8px; padding:9px 10px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .chk { display:flex; align-items:center; gap:8px; }
+  button { font:inherit; font-weight:600; background:var(--acc); color:#fff; border:0; border-radius:8px; padding:12px; cursor:pointer; }
+  .msg { background:#fee2e2; color:#991b1b; border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+  #prev { max-height:90px; display:none; background:#fff; border:1px dashed var(--bd); border-radius:8px; padding:4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Firma PDF</h1>
+  {% for m in get_flashed_messages() %}<div class="msg">{{ m }}</div>{% endfor %}
+  <form method="post" action="{{ url_for('firmar_view') }}" enctype="multipart/form-data">
+    <label>Documento PDF
+      <input type="file" name="pdf" accept="application/pdf,.pdf" required>
+    </label>
+    <label>Imagen de la firma (PNG/JPG)
+      <input type="file" name="firma" id="firma" accept="image/*" required>
+    </label>
+    <img id="prev" alt="Vista previa de la firma">
+
+    <label>Nombre completo
+      <input name="nombre_completo" value="{{ perfil.nombre_completo }}" required>
+    </label>
+    <div class="row">
+      <label>Cédula
+        <input name="cedula" value="{{ perfil.cedula }}" required>
+      </label>
+      <label>Lugar
+        <input name="lugar" value="{{ perfil.lugar }}" required>
+      </label>
+    </div>
+    <div class="row">
+      <label>Página
+        <select name="pagina" id="pagina">
+          <option value="ultima">Última</option>
+          <option value="primera">Primera</option>
+          <option value="todas">Todas</option>
+          <option value="numero">Número…</option>
+        </select>
+      </label>
+      <label>N.º de página
+        <input type="number" name="numero_pagina" id="numpag" min="1" value="1" disabled>
+      </label>
+    </div>
+    <label>Posición
+      <select name="posicion">
+        {% for k, v in posiciones.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" name="guardar"> Guardar nombre, cédula y lugar como predeterminados</label>
+    <p style="margin:0;color:var(--mut);font-size:.85rem">La fecha y hora se agregan automáticamente.</p>
+    <button type="submit">Firmar y descargar</button>
+  </form>
+</main>
+<script>
+  const f = document.getElementById('firma'), p = document.getElementById('prev');
+  f.addEventListener('change', () => {
+    if (f.files[0]) { p.src = URL.createObjectURL(f.files[0]); p.style.display = 'block'; }
+  });
+  const sel = document.getElementById('pagina'), n = document.getElementById('numpag');
+  sel.addEventListener('change', () => { n.disabled = sel.value !== 'numero'; });
+</script>
+</body>
+</html>
